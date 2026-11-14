@@ -170,6 +170,11 @@ def resolve_source_ref(source_ref: str, context: Dict[str, Any]) -> float:
     if source_ref.startswith("calc:"):
         key = source_ref[len("calc:"):]
         if key == "margin_lead":
+            rep = context.get("report")
+            if rep and getattr(rep, "sections", None):
+                strats = rep.sections.get("strategies_compared", [])
+                if len(strats) >= 2:
+                    return float(round(strats[0].get("net_contribution_12", 0.0) - strats[1].get("net_contribution_12", 0.0), 2))
             sim_runs = context.get("sim_runs", [])
             exp_runs = [r for r in sim_runs if getattr(r, "scenario", "") == "expected"]
             if len(exp_runs) >= 2:

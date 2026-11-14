@@ -12,6 +12,17 @@ from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
+# Load local .env into os.environ if present
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    with open(_env_path, "r", encoding="utf-8") as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
+
 T = TypeVar("T", bound=BaseModel)
 
 CASSETTES_DIR = Path(__file__).resolve().parent.parent / "tests" / "cassettes"
@@ -369,7 +380,10 @@ class LLMClient:
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
-default_llm_client = LLMClient()
+default_llm_client = None
+
+def get_default_llm_client() -> LLMClient:
+    return LLMClient()
 
 async def llm_call(
     prompt: str,
@@ -378,5 +392,5 @@ async def llm_call(
     client: Optional[LLMClient] = None,
     **kwargs
 ) -> T:
-    c = client or default_llm_client
+    c = client or get_default_llm_client()
     return await c.call(prompt, response_model, system_prompt=system_prompt, **kwargs)

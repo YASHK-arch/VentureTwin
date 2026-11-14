@@ -86,12 +86,28 @@ class Finding(BaseModel):
     degraded_reason: Optional[str] = None
     recovered_via_backup: bool = False
 
+class DecisionClassification(BaseModel):
+    category: Literal[
+        "decision_ready",
+        "ambiguous",
+        "informational",
+        "insufficient_data",
+        "out_of_domain"
+    ] = "decision_ready"
+    subtype: Optional[str] = None
+    department: Optional[str] = None
+    target_fte: Optional[int] = None
+    target_spend: Optional[float] = None
+    clarification_prompt: Optional[str] = None
+    clarification_options: List[str] = Field(default_factory=list)
+
 class Decision(BaseModel):
     id: str
     type: str = "strategic_decision"
     question: str
     objective: str
     constraints: Dict[str, Any] = Field(default_factory=dict)
+    classification: Optional[DecisionClassification] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 TaskKind = Literal[
@@ -131,6 +147,14 @@ class Conflict(BaseModel):
     resolution_method: Optional[Literal["simulation_isolation", "rebuttal_concession", "skeptic_audit", "procedural"]] = None
     sides: List[Dict[str, Any]] = Field(default_factory=list)
     isolated_simulation_deltas: Optional[Dict[str, float]] = None
+
+class SkepticAuditReport(BaseModel):
+    challenged_assumptions: List[Dict[str, Any]] = Field(default_factory=list)
+    financial_inconsistencies: List[Dict[str, Any]] = Field(default_factory=list)
+    unsupported_claims: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_gaps: List[Dict[str, Any]] = Field(default_factory=list)
+    recommendation_risks: List[Dict[str, Any]] = Field(default_factory=list)
+    verification_status: Literal["passed", "failed"] = "passed"
 
 class Critique(BaseModel):
     skeptic_agent: str = "Skeptic"

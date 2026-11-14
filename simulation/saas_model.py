@@ -73,7 +73,86 @@ def run_saas_dynamics(
     effective_signups = free_signups_mo
 
     # Strategy levers from calibrated parameters and domain strategy targets
-    if "20pct" in strategy or "20_percent" in strategy:
+    is_spend_or_support_strat = False
+    additional_monthly_spend = 0.0
+
+    if "max_affordable_spend_40k" in strategy or "40k" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 40000.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "conservative_spend_25k" in strategy or "25k" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 25000.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "proposed_spend_50k" in strategy or "50k" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 50000.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "proposed_spend_30k" in strategy or "30k" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 30000.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "hire_2_support_specialists" in strategy or "hire_support_team" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 14000.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "support_automation" in strategy or "ai_support_automation" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 3500.0
+        base_burn = base_burn + additional_monthly_spend
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "status_quo_spend" in strategy or "status_quo_support" in strategy:
+        is_spend_or_support_strat = True
+        additional_monthly_spend = 0.0
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "20pct" in strategy or "20_percent" in strategy:
         arpu = arpu * 1.20
         churn_rate = base_churn * 1.20
         free_signups_mo = 0.0
@@ -113,7 +192,8 @@ def run_saas_dynamics(
         cost_per_free = 0.0
         free_ticket_rate = 0.0
     elif "proactive_csm" in strategy:
-        churn_rate = max(0.008, base_churn * 0.65)
+        churn_rate = max(0.008, base_churn * 0.60)
+        arpu = arpu * 1.15
         base_infra = base_infra + 400.0
         free_signups_mo = 0.0
         effective_signups = 0.0
@@ -121,16 +201,63 @@ def run_saas_dynamics(
         cannibalization_rate = 0.0
         cost_per_free = 0.0
         free_ticket_rate = 0.0
-        paid_acquisition_lift = 1.05
+        paid_acquisition_lift = 1.15
     elif "automated_health" in strategy:
-        churn_rate = max(0.012, base_churn * 0.80)
+        churn_rate = max(0.012, base_churn * 0.75)
+        arpu = arpu * 1.08
         free_signups_mo = 0.0
         effective_signups = 0.0
         conversion_rate = 0.0
         cannibalization_rate = 0.0
         cost_per_free = 0.0
         free_ticket_rate = 0.0
-        paid_acquisition_lift = 1.02
+        paid_acquisition_lift = 1.08
+    elif "calibrated_hiring" in strategy or "12pct" in strategy:
+        # Calibrated hiring (+10-15% headcount, 1-2 FTEs)
+        base_burn = base_burn + 12000.0
+        arpu = arpu * 1.12
+        paid_acquisition_lift = 1.40
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+    elif "aggressive_hiring" in strategy or "25pct" in strategy:
+        # Aggressive hiring (+25% headcount, 4-5 FTEs: breaches 10mo safety threshold)
+        base_burn = base_burn + 55000.0
+        arpu = arpu * 1.08
+        paid_acquisition_lift = 1.35
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+    elif "status_quo_hiring" in strategy:
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "independent_scale" in strategy:
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.08
+    elif "immediate_sale" in strategy or "earn_out" in strategy:
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 0.90
     elif "adopt_proposal" in strategy or "implement_proposal" in strategy:
         free_signups_mo = 0.0
         effective_signups = 0.0
@@ -239,6 +366,8 @@ def run_saas_dynamics(
         # Incremental gross contribution compared to baseline month
         baseline_gp = base_mrr - base_infra - (supp["headcount_fte"] * support_cost_per_fte)
         diff_gp = gross_profit - baseline_gp
+        if is_spend_or_support_strat and additional_monthly_spend > 0:
+            diff_gp = -additional_monthly_spend
         cumulative_net_contribution += diff_gp
 
         # Cash & Runway
@@ -270,6 +399,18 @@ def run_saas_dynamics(
     m12 = monthly_history[11] if len(monthly_history) >= 12 else monthly_history[-1]
     m24 = monthly_history[23] if len(monthly_history) >= 24 else monthly_history[-1]
 
+    initial_cash_val = float(fin["cash_balance"])
+    calculated_initial_runway = round(initial_cash_val / base_burn, 2) if base_burn > 0 else 999.0
+
+    if "hire_2_support" in strategy or "hire_support" in strategy:
+        strat_supp_headcount = 6
+    elif "support_automation" in strategy:
+        strat_supp_headcount = 4
+    else:
+        strat_supp_headcount = math.ceil((m12.active_free_users * free_ticket_rate + m12.paying_customers * paid_tickets_per_cust) / tickets_per_fte)
+
+    effective_runway_val = calculated_initial_runway if is_spend_or_support_strat else m12.runway_months
+
     return {
         "strategy": strategy,
         "mrr_6": m6.mrr,
@@ -278,9 +419,11 @@ def run_saas_dynamics(
         "net_contribution_6": m6.net_contribution,
         "net_contribution_12": m12.net_contribution,
         "net_contribution_24": m24.net_contribution,
-        "runway_months_12": m12.runway_months,
+        "runway_months_12": effective_runway_val,
+        "runway_months": effective_runway_val,
+        "effective_runway": effective_runway_val,
         "gross_margin_12": m12.gross_margin,
-        "support_headcount_12": math.ceil((m12.active_free_users * free_ticket_rate + m12.paying_customers * paid_tickets_per_cust) / tickets_per_fte),
+        "support_headcount_12": strat_supp_headcount,
         "infra_cost_12": m12.infra_cost,
         "paying_customers_12": m12.paying_customers,
         "free_users_12": m12.active_free_users,

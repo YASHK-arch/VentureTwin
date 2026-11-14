@@ -573,8 +573,26 @@ class Supervisor:
             strategies = ["A_enterprise_dedicated_sla", "B_self_serve_pro_tier", "C_status_quo"]
         elif dec_type == "churn_reduction":
             strategies = ["A_proactive_csm_program", "B_automated_health_scoring", "C_status_quo"]
+        elif dec_type == "hiring_headcount":
+            strategies = ["A_calibrated_hiring_12pct", "B_aggressive_hiring_25pct", "C_status_quo_hiring"]
+        elif dec_type == "m_and_a_exit":
+            strategies = ["A_status_quo_independent_scale", "B_structured_earn_out", "C_immediate_sale_at_discount"]
         elif dec_type == "strategic_decision":
             strategies = ["A_adopt_proposal", "B_targeted_pilot", "C_status_quo"]
+        elif dec_type == "max_expenditure":
+            strategies = ["A_max_affordable_spend_40k", "B_conservative_spend_25k", "C_status_quo_spend"]
+        elif dec_type == "support_hiring":
+            strategies = ["A_hire_2_support_specialists", "B_support_automation_and_deflection", "C_status_quo_support"]
+        elif dec_type == "hiring_vs_automation":
+            strategies = ["A_hire_support_team", "B_ai_support_automation", "C_status_quo_support"]
+        elif dec_type == "spend_budget":
+            target_spend = getattr(getattr(state.decision, "classification", None), "target_spend", None)
+            if target_spend and target_spend >= 45000:
+                strategies = ["A_proposed_spend_50k", "B_capped_affordable_spend_40k", "C_status_quo_spend"]
+            elif target_spend and target_spend <= 35000:
+                strategies = ["A_proposed_spend_30k", "B_max_affordable_spend_40k", "C_status_quo_spend"]
+            else:
+                strategies = ["A_max_affordable_spend_40k", "B_conservative_spend_25k", "C_status_quo_spend"]
         else:
             strategies = ["A_limited_features", "B_usage_caps", "C_no_free_plan"]
 

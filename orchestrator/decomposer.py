@@ -9,6 +9,10 @@ def decompose_decision(decision: Decision) -> TaskDAG:
             f"VentureTwin v0.1 MVP specializes in Freemium / Free Plan packaging decisions. "
             f"Price change elasticity modeling is planned for v0.2 roadmap. (Query: {decision.question})"
         )
+    if decision.type == "ambiguous" or (decision.classification and decision.classification.category in ["ambiguous", "insufficient_data"]):
+        raise DAGValidationError(
+            f"Clarification Required: {decision.objective}"
+        )
 
     # 1. Parallel specialist analysis tasks
     analysis_tasks = [

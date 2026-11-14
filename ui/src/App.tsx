@@ -141,6 +141,12 @@ export const App: React.FC = () => {
       resetChoreographer();
 
       const res = await submitDecision(q, undefined, stagedFault || undefined);
+      if (res.status === 'needs_clarification') {
+        setWorkflowStatus('idle');
+        const opts = (res.options || []).join(', ');
+        alert(`${res.clarification_prompt}\n\nSuggested: ${opts}`);
+        return;
+      }
       setCurrentDecisionId(res.decision_id);
       setStagedFault(null);
       setActiveTab('console');

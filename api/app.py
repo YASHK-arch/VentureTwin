@@ -173,6 +173,15 @@ async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTask
             status_code=400,
             detail=decision.objective
         )
+    if decision.type == "ambiguous" or (decision.classification and decision.classification.category in ["ambiguous", "insufficient_data"]):
+        return {
+            "status": "needs_clarification",
+            "decision_id": decision.id,
+            "category": decision.classification.category if decision.classification else "ambiguous",
+            "question": decision.question,
+            "clarification_prompt": decision.classification.clarification_prompt if decision.classification else decision.objective,
+            "options": decision.classification.clarification_options if decision.classification else []
+        }
     
     from agents.llm_client import LLMClient
     supervisor = Supervisor(llm_client=LLMClient())
