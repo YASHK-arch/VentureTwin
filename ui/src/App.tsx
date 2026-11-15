@@ -6,6 +6,9 @@ import {
   fetchDecisionStatus,
   fetchDecisionReport,
   injectFailure,
+  fetchAuthMe,
+  logout,
+  UserProfile,
   CompanySnapshot,
   TaskItem,
   FindingItem,
@@ -19,8 +22,15 @@ import { CalibrationView } from './components/CalibrationView';
 import { CompanyGraphView } from './components/CompanyGraphView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useEventChoreographer } from './orchestration/useEventChoreographer';
+import { AuthScreen } from './components/auth/AuthScreen';
+import { ExecutiveProfilePill } from './components/auth/ExecutiveProfilePill';
+import { VentureTwinLogo } from './components/auth/VentureTwinLogo';
 
 export const App: React.FC = () => {
+  // Authentication state
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const [activeTab, setActiveTab] = useState<'console' | 'report' | 'calibration' | 'graph'>('console');
   const [company, setCompany] = useState<CompanySnapshot | null>(null);
   const [health, setHealth] = useState<{ llm_mode: string; provider: string; model: string } | null>(null);
@@ -51,6 +61,22 @@ export const App: React.FC = () => {
     isRealMode
   });
 
+  // Check active executive session on mount
+  useEffect(() => {
+    fetchAuthMe()
+      .then((res) => {
+        if (res.authenticated && res.user) {
+          setCurrentUser(res.user);
+        }
+      })
+      .catch(() => {
+        setCurrentUser(null);
+      })
+      .finally(() => {
+        setIsCheckingAuth(false);
+      });
+  }, []);
+
   // Guard tabs: if user has not given a prompt, restrict to console
   useEffect(() => {
     if (!hasGivenPrompt && activeTab !== 'console') {
@@ -58,11 +84,13 @@ export const App: React.FC = () => {
     }
   }, [hasGivenPrompt, activeTab]);
 
-  // Load initial company snapshot and health
+  // Load company snapshot and health once authenticated
   useEffect(() => {
-    fetchCompany().then(setCompany).catch(console.error);
-    fetchHealth().then(setHealth).catch(console.error);
-  }, []);
+    if (currentUser) {
+      fetchCompany().then(setCompany).catch(console.error);
+      fetchHealth().then(setHealth).catch(console.error);
+    }
+  }, [currentUser]);
 
   // Poll workflow status when a decision is active
   useEffect(() => {
@@ -186,24 +214,46 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      console.warn('Logout notice:', e);
+    } finally {
+      setCurrentUser(null);
+      handleResetToNewQuestion();
+    }
+  };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 select-none">
+        <VentureTwinLogo size="hero" pulsing={true} glow={true} showSubtitle={true} />
+        <div className="mt-8 flex items-center gap-2.5 text-xs font-mono text-brand-400 uppercase tracking-widest">
+          <div className="w-2 h-2 rounded-full bg-brand-400 animate-ping" />
+          <span>Verifying Executive Session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <AuthScreen
+        onAuthenticated={(user) => {
+          setCurrentUser(user);
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col animate-in fade-in duration-500">
       {/* Top Navigation Bar */}
       <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-emerald-600 flex items-center justify-center font-bold text-slate-950 text-base shadow-lg shadow-brand-500/20">
-              VT
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight text-white">VentureTwin</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase bg-slate-800 text-slate-300">
-                  SwarmFlow Engine
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400">AI Flight Simulator & Operational Digital Twin for SaaS CEOs</p>
-            </div>
+            <VentureTwinLogo size="nav" showText={true} badgeText="SwarmFlow Engine" />
           </div>
 
           <nav className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
@@ -278,6 +328,11 @@ export const App: React.FC = () => {
               Company Graph
             </button>
           </nav>
+
+          {/* Executive User Profile & Sign Out */}
+          <div className="flex items-center gap-3">
+            <ExecutiveProfilePill user={currentUser} onLogout={handleLogout} />
+          </div>
         </div>
       </header>
 

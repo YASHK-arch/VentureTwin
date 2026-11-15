@@ -14,11 +14,13 @@ if _env_path.exists():
             if _line and not _line.startswith("#") and "=" in _line:
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Response, Depends, Cookie, Header
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+from api import auth
 
 from data.loader import get_company_snapshot, load_company_data, load_seeded_decisions
 from state.schemas import Decision, Report, DecisionRecord, Event
@@ -73,6 +75,40 @@ class DecisionRequest(BaseModel):
 class ApprovalRequest(BaseModel):
     action: Literal["approve", "reject", "request_changes"]
     notes: Optional[str] = None
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+    remember_me: bool = False
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+def extract_session_token(request: Request) -> Optional[str]:
+    token = request.cookies.get("vt_session")
+    if token:
+        return token
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+    return None
+
+def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
+    token = extract_session_token(request)
+    if not token:
+        return None
+    return auth.get_session_user(token)
+
+def require_current_user(request: Request) -> Dict[str, Any]:
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required or session expired.")
+    return user
 
 @app.get("/")
 async def root():
@@ -474,3 +510,80 @@ async def get_company_graph():
     ]
 
     return {"nodes": nodes, "edges": edges}
+
+@app.post("/api/auth/register")
+async def auth_register(req: RegisterRequest, response: Response):
+    """Registers a new executive user account and establishes a session."""
+    try:
+        user = auth.create_user(req.email, req.password, req.full_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    session = auth.create_session(user["id"], remember_me=False)
+    response.set_cookie(
+        key="vt_session",
+        value=session["token"],
+        max_age=session["max_age_seconds"],
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+    return {
+        "status": "success",
+        "authenticated": True,
+        "user": user,
+        "token": session["token"]
+    }
+
+@app.post("/api/auth/login")
+async def auth_login(req: LoginRequest, response: Response):
+    """Authenticates executive credentials and sets a secure session cookie."""
+    user = auth.authenticate_user(req.email, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid executive credentials.")
+    session = auth.create_session(user["id"], remember_me=req.remember_me)
+    response.set_cookie(
+        key="vt_session",
+        value=session["token"],
+        max_age=session["max_age_seconds"],
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+    return {
+        "status": "success",
+        "authenticated": True,
+        "user": user,
+        "token": session["token"]
+    }
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """Returns current authenticated executive profile if session is valid."""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session expired or not authenticated.")
+    return {
+        "authenticated": True,
+        "user": user
+    }
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request, response: Response):
+    """Invalidates active executive session and clears session cookie."""
+    token = extract_session_token(request)
+    if token:
+        auth.delete_session(token)
+    response.delete_cookie(key="vt_session", path="/", samesite="lax")
+    return {"status": "logged_out", "authenticated": False}
+
+@app.post("/api/auth/forgot-password")
+async def auth_forgot_password(req: ForgotPasswordRequest):
+    """Dispatches password reset instructions for verified account."""
+    token = auth.create_password_reset(req.email)
+    return {
+        "status": "success",
+        "message": "If this email belongs to a registered executive, recovery instructions have been initiated."
+    }
+

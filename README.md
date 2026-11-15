@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.162.2-009688.svg?logo=fastapi&logoColor=white" alt="FastAPI 0.162.2">
   <img src="https://img.shields.io/badge/React-19.0.0-61DAFB.svg?logo=react&logoColor=black" alt="React 19.0.0">
   <img src="https://img.shields.io/badge/TypeScript-5.7.0-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript 5.7.0">
-  <img src="https://img.shields.io/badge/Tests-184%20passed-brightgreen.svg" alt="184 Pytest Suite Passing">
+  <img src="https://img.shields.io/badge/Tests-189%20passed-brightgreen.svg" alt="189 Pytest Suite Passing">
   <img src="https://img.shields.io/badge/Verification-15%20Automated%20Checks-teal.svg" alt="15 Automated Verification Checks">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
 </p>
@@ -250,7 +250,7 @@ Verified directly from [`pyproject.toml`](pyproject.toml) and [`ui/package.json`
 | **Type Validation** | Pydantic | `2.14.3` | Bounded parameter schemas, finding models, contract enforcement |
 | **Scientific Math** | NumPy / SciPy | `2.5.4` / `1.18.1` | Monte Carlo distributions, quantile calculations, sensitivity sweeps |
 | **Async HTTP** | HTTPX | `0.28.1` | Non-blocking LLM provider communications with retry management |
-| **Test Harness** | Pytest / Pytest-Asyncio | `9.2.0` / `0.25.3` | 184 unit, integration, invariant, and chaos tests |
+| **Test Harness** | Pytest / Pytest-Asyncio | `9.2.0` / `0.25.3` | 189 unit, integration, invariant, and chaos tests |
 | **Frontend UI** | React / React-DOM | `19.0.0` | Mission-control reactive user interface component tree |
 | **Frontend Tooling** | Vite / TypeScript | `6.2.0` / `5.7.0` | Lightning-fast HMR bundler and strict end-to-end type contracts |
 | **UI Styling** | Tailwind CSS | `3.4.17` | Dark-mode mission-control design system |
@@ -330,7 +330,7 @@ VentureTwin maintains rigorous automated testing and algorithmic verification:
 ```bash
 # Execute the complete automated test suite
 pytest tests/ -q
-# 184 passed, 3 skipped in 15.59s
+# 189 passed, 3 skipped in 16.33s
 ```
 
 ### The 15 Algorithmic Verification Checks
