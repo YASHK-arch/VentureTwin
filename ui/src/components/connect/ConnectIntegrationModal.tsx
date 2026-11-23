@@ -34,40 +34,64 @@ export const ConnectIntegrationModal: React.FC<ConnectIntegrationModalProps> = (
 
   if (!isOpen) return null;
 
-  const handleSsoConnect = async () => {
+  const handleSsoConnect = () => {
     setLoading(true);
     setError(null);
-    try {
-      // 1. Request short-lived Connect Session Token from VentureTwin backend
-      const sess = await fetchNangoSessionToken('default', [connectorId]);
-      
-      // If live Nango session is active, trigger Nango frontend modal
-      if (!sess.is_sandbox && sess.token) {
+
+    const width = 540;
+    const height = 680;
+    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+
+    const targetUrl = `/api/integrations/oauth/authorize?provider=${connectorId}&email=${encodeURIComponent(
+      accountEmail || 'founder@venturetwin.com'
+    )}&company_id=default`;
+
+    const popup = window.open(
+      targetUrl,
+      'nango_oauth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no`
+    );
+
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      setError('Popup was blocked by your browser. Please allow popups or use the sandbox option.');
+      setLoading(false);
+      return;
+    }
+
+    const messageListener = async (event: MessageEvent) => {
+      if (event.data?.type === 'NANGO_AUTH_SUCCESS' && event.data.provider === connectorId) {
+        window.removeEventListener('message', messageListener);
         try {
-          const nango = new Nango({ connectSessionToken: sess.token });
-          await nango.auth(connectorId, `conn_${connectorId}_${Date.now()}`);
-          await notifyNangoCallback({
-            connection_id: `conn_${connectorId}_${Date.now()}`,
-            provider_config_key: connectorId,
-            company_id: 'default',
+          const updated = await directConnectIntegration(connectorId, {
+            auth_mode: 'sso',
+            account_email: accountEmail || 'founder@venturetwin.com',
           });
-        } catch (nangoErr) {
-          console.warn('Nango modal dismissed or local fallback:', nangoErr);
+          onConnected(updated);
+          onClose();
+        } catch {}
+      }
+    };
+    window.addEventListener('message', messageListener);
+
+    // Watch for popup window closure
+    const pollTimer = setInterval(async () => {
+      if (popup.closed) {
+        clearInterval(pollTimer);
+        window.removeEventListener('message', messageListener);
+        setLoading(false);
+        try {
+          const updated = await directConnectIntegration(connectorId, {
+            auth_mode: 'sso',
+            account_email: accountEmail || 'founder@venturetwin.com',
+          });
+          onConnected(updated);
+          onClose();
+        } catch (err: any) {
+          setError(err?.message || 'Connection check failed');
         }
       }
-
-      // Complete link in VentureTwin backend
-      const updated = await directConnectIntegration(connectorId, {
-        auth_mode: 'sso',
-        account_email: accountEmail || 'founder@venturetwin.com',
-      });
-      onConnected(updated);
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to authenticate via Google/SSO');
-    } finally {
-      setLoading(false);
-    }
+    }, 600);
   };
 
   const handleSandboxConnect = async () => {
