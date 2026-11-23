@@ -107,7 +107,7 @@
 
 ## 7. The 60-Second Demo Script
 
-1. **Onboarding & Boardroom (15s):** Show the new **Connect Company Data** tab. Demonstrate uploading a strategy memo or scraping a website, or load the baseline profile. Click **`💬 Boardroom`** on the top right to show the Cursor dark theme panel and chat 1-on-1 directly with the CFO.
+1. **Onboarding & Boardroom (15s):** Show the **Connect Company Data** onboarding flow from the Decision Console. Demonstrate uploading a strategy memo or scraping a website, or load the baseline profile. Click **`💬 Boardroom`** on the top right to show the Cursor dark theme panel and chat 1-on-1 directly with the CFO.
 2. **Decision Intake & Execution (15s):** Return to the Decision Console. Select the strategic query: *"Should we launch a free plan?"* and click **Run Simulation**. Watch the 11-node DAG execute parallel specialist waves over SSE.
 3. **Chaos Injection (10s):** Open the live chaos injection panel mid-run. Inject a transient crash into the CTO; show the live event stream emit `agent_failed`, followed by autonomous recovery and completion.
 4. **Decision Report & Sign-Off (20s):** Switch to the Decision Report tab. Highlight the **Scenario Outcome Matrix**, the **Tornado Sensitivity Analysis**, the **Empirical Conflict Resolution** table, the **15/15 Algorithmic Verification Checks**, and execute the **Human Executive Sign-Off Gate** (Approve / Reject).
