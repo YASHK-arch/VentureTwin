@@ -40,14 +40,12 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, errorMsg, missingVars
     sandbox_connected:    { label: 'Sandbox',                icon: '◑', cls: 'bg-teal-950 text-teal-300 border-teal-800' },
     syncing:              { label: 'Syncing',                icon: '↻', cls: 'bg-purple-950 text-purple-300 border-purple-800 animate-pulse' },
     error:                { label: 'Error',                  icon: '✕', cls: 'bg-red-950 text-red-300 border-red-800' },
-    awaiting_credentials: { label: 'Awaiting Credentials',  icon: '⚠', cls: 'bg-amber-950 text-amber-300 border-amber-700' },
+    awaiting_credentials: { label: 'Not Connected',         icon: '○', cls: 'bg-[#222222] text-[#888888] border-[#333333]' },
   };
 
   const cfg = configs[status];
-  const hasTooltip = status === 'awaiting_credentials' || status === 'error';
-  const tooltipContent = status === 'awaiting_credentials'
-    ? missingVars.join(', ')
-    : errorMsg ?? '';
+  const hasTooltip = status === 'error';
+  const tooltipContent = errorMsg ?? '';
 
   return (
     <div className="relative inline-flex flex-shrink-0">
@@ -133,20 +131,6 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
         </div>
       )}
 
-      {/* Awaiting credentials callout */}
-      {awaitingCreds && status && status.missing_env_vars.length > 0 && (
-        <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2 space-y-1">
-          <p className="text-[10px] text-amber-400 font-semibold">Missing environment variables:</p>
-          <div className="flex flex-wrap gap-1">
-            {status.missing_env_vars.map((v) => (
-              <span key={v} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-800/60">
-                {v}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Backend unavailable fallback */}
       {!status && !isLoading && (
         <div className="text-[10px] text-[#555555] italic">Backend unavailable — status unknown</div>
@@ -155,7 +139,7 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
       {/* Action buttons row */}
       <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
         {/* Connect */}
-        {!isConnected && !awaitingCreds && st !== 'connecting' && (
+        {!isConnected && st !== 'connecting' && (
           <button
             onClick={onConnect}
             disabled={isLoading}

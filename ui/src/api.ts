@@ -536,3 +536,23 @@ export async function notifyNangoCallback(payload: {
   return res.json();
 }
 
+export async function directConnectIntegration(
+  connectorId: string,
+  payload: {
+    company_id?: string;
+    auth_mode?: string;
+    account_email?: string;
+    custom_credentials?: Record<string, string>;
+  } = {}
+): Promise<ConnectorStatusInfo> {
+  const res = await fetch(`${API_BASE}/integrations/direct-connect/${connectorId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`Failed to direct connect ${connectorId}`);
+  const data = await res.json();
+  return data.connector_status;
+}
+

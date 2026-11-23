@@ -7,6 +7,7 @@ import {
   generateSyntheticData,
 } from '../../api';
 import { IntegrationConnectorCard } from './IntegrationConnectorCard';
+import { ConnectIntegrationModal } from './ConnectIntegrationModal';
 
 interface IntegrationDef {
   connectorId: string;
@@ -40,6 +41,7 @@ export const AgentIntegrationCard: React.FC<AgentIntegrationCardProps> = ({
   const [loadingKeys, setLoadingKeys] = useState<Set<LoadingKey>>(new Set());
   const [localStatuses, setLocalStatuses] = useState<ConnectorStatusInfo[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [activeModalConnector, setActiveModalConnector] = useState<IntegrationDef | null>(null);
 
   // Merge prop statuses with any locally-updated ones
   const mergedStatuses = (cid: string): ConnectorStatusInfo | null => {
@@ -63,18 +65,8 @@ export const AgentIntegrationCard: React.FC<AgentIntegrationCardProps> = ({
     });
   };
 
-  const handleConnect = async (connectorId: string) => {
-    const key: LoadingKey = `${connectorId}:connect`;
-    setLoading(key, true);
-    setErrors((e) => ({ ...e, [connectorId]: '' }));
-    try {
-      const updated = await connectIntegration(connectorId);
-      updateLocalStatus(updated);
-    } catch (err) {
-      setErrors((e) => ({ ...e, [connectorId]: err instanceof Error ? err.message : String(err) }));
-    } finally {
-      setLoading(key, false);
-    }
+  const handleConnect = (integ: IntegrationDef) => {
+    setActiveModalConnector(integ);
   };
 
   const handleDisconnect = async (connectorId: string) => {
@@ -174,7 +166,7 @@ export const AgentIntegrationCard: React.FC<AgentIntegrationCardProps> = ({
               displayName={integ.displayName}
               description={integ.description}
               status={statusWithErr}
-              onConnect={() => handleConnect(integ.connectorId)}
+              onConnect={() => handleConnect(integ)}
               onDisconnect={() => handleDisconnect(integ.connectorId)}
               onSync={() => handleSync(integ.connectorId)}
               onGenerate={() => handleGenerate(integ.connectorId)}
@@ -183,6 +175,19 @@ export const AgentIntegrationCard: React.FC<AgentIntegrationCardProps> = ({
           );
         })}
       </div>
+
+      {/* Connect Integration Modal (Google / SSO / Sandbox) */}
+      {activeModalConnector && (
+        <ConnectIntegrationModal
+          connectorId={activeModalConnector.connectorId}
+          displayName={activeModalConnector.displayName}
+          description={activeModalConnector.description}
+          environment={mergedStatuses(activeModalConnector.connectorId)?.environment || 'test'}
+          isOpen={true}
+          onClose={() => setActiveModalConnector(null)}
+          onConnected={(updated) => updateLocalStatus(updated)}
+        />
+      )}
     </div>
   );
 };
