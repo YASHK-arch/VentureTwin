@@ -35,23 +35,19 @@ export const ExecutiveProfilePill: React.FC<ExecutiveProfilePillProps> = ({ user
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all text-xs focus:outline-none focus:ring-1 focus:ring-brand-500/50 shadow-sm"
+        className="flex items-center gap-2 px-2 py-0.5 rounded-md bg-[#222222] hover:bg-[#2a2a2a] border border-[#2e2e2e] text-slate-200 transition-all text-xs focus:outline-none shadow-sm cursor-pointer"
         title="Executive Account Settings"
       >
-        <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-slate-950 font-bold text-[11px] shadow-sm">
+        <div className="w-5 h-5 rounded bg-gradient-to-tr from-brand-600 to-purple-400 flex items-center justify-center text-slate-950 font-bold text-[10px] shadow-sm">
           {initials}
         </div>
         <div className="text-left hidden sm:block">
-          <p className="font-semibold text-white leading-tight truncate max-w-[140px]">
+          <p className="font-semibold text-white leading-tight truncate max-w-[120px] text-xs">
             {user.full_name || user.email}
-          </p>
-          <p className="text-[10px] text-brand-400 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            {user.role || 'Executive'}
           </p>
         </div>
         <svg
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

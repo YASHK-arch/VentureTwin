@@ -22,6 +22,33 @@ from pydantic import BaseModel, Field
 
 from api import auth
 
+from services.company_extractor import (
+    extract_company_context_from_markdown,
+    ALL_FIELDS,
+    REQUIRED_FIELDS,
+    OPTIONAL_FIELDS,
+    RawExtractedCompanyContext,
+    ExtractionResult
+)
+from services.website_scraper import (
+    enrich_company_context_from_website,
+    WebsiteScrapeError
+)
+from services.company_context_store import (
+    init_company_context_db,
+    save_company_context,
+    get_active_company_context,
+    list_company_contexts,
+    get_company_context_by_id,
+    delete_company_context
+)
+from services.agent_chat import (
+    chat_with_agent,
+    AgentChatRequest,
+    AgentChatResponse,
+    AGENT_META_MAP
+)
+
 from data.loader import get_company_snapshot, load_company_data, load_seeded_decisions
 from state.schemas import Decision, Report, DecisionRecord, Event
 from state.shared_state import WorkflowState
@@ -88,6 +115,34 @@ class LoginRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+
+class MarkdownFilePayload(BaseModel):
+    filename: str
+    content: str
+
+class ExtractCompanyContextRequest(BaseModel):
+    files: List[MarkdownFilePayload]
+
+class ScrapeWebsiteRequest(BaseModel):
+    url: str
+
+class CompanyContextPayload(BaseModel):
+    id: Optional[str] = None
+    company_name: str
+    industry: str
+    business_model: str
+    description: str
+    products_services: str
+    target_customers: str
+    revenue_model: str
+    geographic_presence: Optional[str] = ""
+    stage: str
+    strategic_goals: str
+    major_challenges: Optional[str] = ""
+    key_competitors: Optional[str] = ""
+    website_url: Optional[str] = ""
+    provenance: Optional[Dict[str, Any]] = None
+    uploaded_documents: Optional[List[Dict[str, Any]]] = None
 
 def extract_session_token(request: Request) -> Optional[str]:
     token = request.cookies.get("vt_session")
@@ -199,6 +254,91 @@ async def health(probe: bool = False):
 async def get_company():
     """Returns the company snapshot for NimbusDesk with synthetic data badge."""
     return get_company_snapshot()
+
+@app.post("/api/company/extract")
+async def extract_company_context(req: ExtractCompanyContextRequest):
+    """Parses uploaded markdown files and extracts structured company context using LLM or heuristic fallback."""
+    files_data = [{"filename": f.filename, "content": f.content} for f in req.files]
+    result = await extract_company_context_from_markdown(files_data)
+    return result.model_dump()
+
+@app.post("/api/company/scrape-website")
+async def scrape_company_website(req: ScrapeWebsiteRequest):
+    """Scrapes a public corporate website and enriches company context fields."""
+    try:
+        result = await enrich_company_context_from_website(req.url)
+        return result.model_dump()
+    except WebsiteScrapeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to scrape website: {e}")
+
+@app.post("/api/company/context")
+async def save_context(req: CompanyContextPayload, request: Request):
+    """Saves or updates a company context profile in SQLite database."""
+    required = [
+        ("company_name", req.company_name),
+        ("industry", req.industry),
+        ("business_model", req.business_model),
+        ("description", req.description),
+        ("products_services", req.products_services),
+        ("target_customers", req.target_customers),
+        ("revenue_model", req.revenue_model),
+        ("stage", req.stage),
+        ("strategic_goals", req.strategic_goals),
+    ]
+    missing = [name for name, val in required if not val or not str(val).strip()]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Missing required company context fields: {', '.join(missing)}"
+        )
+    user = get_current_user(request)
+    user_id = user["id"] if user else None
+    saved = save_company_context(req.model_dump(), user_id=user_id)
+    return {"status": "saved", "context": saved}
+
+@app.get("/api/company/context")
+async def get_active_context(request: Request):
+    """Returns the active company context profile."""
+    user = get_current_user(request)
+    user_id = user["id"] if user else None
+    active = get_active_company_context(user_id=user_id)
+    return {"active": active is not None, "context": active}
+
+@app.get("/api/company/contexts")
+async def list_contexts(request: Request):
+    """Returns all company context profiles (multi-profile support)."""
+    user = get_current_user(request)
+    user_id = user["id"] if user else None
+    contexts = list_company_contexts(user_id=user_id)
+    return {"contexts": contexts}
+
+@app.delete("/api/company/context/{context_id}")
+async def delete_context(context_id: str):
+    """Deletes a company context profile."""
+    deleted = delete_company_context(context_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Company context profile not found.")
+    return {"status": "deleted", "id": context_id}
+
+@app.post("/api/agents/chat", response_model=AgentChatResponse)
+async def agent_chat_endpoint(req: AgentChatRequest, request: Request):
+    """Executes a direct 1-on-1 dialogue with a specific executive agent."""
+    if req.agent_key.lower().strip() not in AGENT_META_MAP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown agent '{req.agent_key}'. Available agents: {list(AGENT_META_MAP.keys())}"
+        )
+    user = get_current_user(request)
+    user_id = user["id"] if user else None
+    response = await chat_with_agent(
+        agent_key=req.agent_key,
+        message=req.message,
+        history=req.history,
+        user_id=user_id
+    )
+    return response
 
 @app.post("/api/decisions")
 async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTasks):
