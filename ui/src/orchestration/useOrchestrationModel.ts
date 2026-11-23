@@ -37,12 +37,23 @@ export interface WarRoomMessage {
     | 'conflict'
     | 'simulation'
     | 'verification'
-    | 'sealed';
+    | 'sealed'
+    | 'chat';
   agent: string;
   timestamp: string;
   title?: string;
   content?: string;
   finding?: FindingItem;
+  chatItem?: {
+    role: 'user' | 'agent';
+    agent_key?: string;
+    agent_name?: string;
+    avatar?: string;
+    text: string;
+    recommendation?: string;
+    confidence?: number;
+    key_metrics?: Record<string, any>;
+  };
   rebuttal?: {
     agent: string;
     parameter: string;

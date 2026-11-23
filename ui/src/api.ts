@@ -254,3 +254,153 @@ export async function fetchCompanyGraph() {
   return res.json();
 }
 
+export interface FieldProvenance {
+  source: 'uploaded_markdown' | 'website_scraper' | 'manual';
+  source_detail?: string;
+  confidence?: number;
+  extracted: boolean;
+}
+
+export interface CompanyContextFields {
+  company_name: string;
+  industry: string;
+  business_model: string;
+  description: string;
+  products_services: string;
+  target_customers: string;
+  revenue_model: string;
+  geographic_presence?: string;
+  stage: string;
+  strategic_goals: string;
+  major_challenges?: string;
+  key_competitors?: string;
+  website_url?: string;
+}
+
+export interface CompanyContextRecord extends CompanyContextFields {
+  id?: string;
+  provenance: Record<string, FieldProvenance>;
+  uploaded_documents?: { filename: string; size?: number; uploaded_at?: string }[];
+  is_active?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ExtractionResult {
+  fields: Record<string, string>;
+  provenance: Record<string, FieldProvenance>;
+  missing_fields: string[];
+  document_names: string[];
+  warnings: string[];
+}
+
+export async function extractCompanyContext(files: { filename: string; content: string }[]): Promise<ExtractionResult> {
+  const res = await fetch(`${API_BASE}/company/extract`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ files })
+  });
+  if (!res.ok) {
+    let msg = 'Failed to extract company context';
+    try {
+      const err = await res.json();
+      if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function scrapeCompanyWebsite(url: string): Promise<ExtractionResult> {
+  const res = await fetch(`${API_BASE}/company/scrape-website`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ url })
+  });
+  if (!res.ok) {
+    let msg = 'Failed to scrape corporate website';
+    try {
+      const err = await res.json();
+      if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function saveCompanyContext(payload: Partial<CompanyContextRecord>): Promise<{ status: string; context: CompanyContextRecord }> {
+  const res = await fetch(`${API_BASE}/company/context`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    let msg = 'Failed to save company context';
+    try {
+      const err = await res.json();
+      if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function fetchActiveCompanyContext(): Promise<{ active: boolean; context: CompanyContextRecord | null }> {
+  const res = await fetch(`${API_BASE}/company/context`, { credentials: 'include', headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch active company context');
+  return res.json();
+}
+
+export async function fetchCompanyContexts(): Promise<{ contexts: CompanyContextRecord[] }> {
+  const res = await fetch(`${API_BASE}/company/contexts`, { credentials: 'include', headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch company contexts');
+  return res.json();
+}
+
+export async function deleteCompanyContext(id: string): Promise<{ status: string; id: string }> {
+  const res = await fetch(`${API_BASE}/company/context/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to delete company context');
+  return res.json();
+}
+
+export interface AgentChatResponse {
+  agent_key: string;
+  agent_name: string;
+  role: string;
+  avatar: string;
+  response: string;
+  key_metrics: Record<string, any>;
+  recommendation: string;
+  confidence: number;
+  timestamp: string;
+}
+
+export async function chatWithAgent(
+  agentKey: string,
+  message: string,
+  history?: { role: string; content: string }[]
+): Promise<AgentChatResponse> {
+  const res = await fetch(`${API_BASE}/agents/chat`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ agent_key: agentKey, message, history })
+  });
+  if (!res.ok) {
+    let msg = 'Failed to communicate with agent';
+    try {
+      const err = await res.json();
+      if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
