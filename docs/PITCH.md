@@ -28,13 +28,13 @@
 
 ```
 [ Strategic Question ]  -->  [ Specialist Swarm ]  -->  [ Simulation Engine ]  -->  [ Verified Report ]
-"Should we launch           CFO, CTO, Growth,           Isolated 12-month           7 Algorithmic Audits
+"Should we launch           CFO, CTO, Growth,           Isolated 12-month           15 Algorithmic Audits
  a free tier?"               Customer, Product           financial simulations      Human Sign-Off Gate
 ```
 
-1. **Strategic Intake & Task Decomposition:**  
-   The user types a business question (e.g., *"Should we launch a free tier?"*). A central Supervisor breaks it down into a coordinated task dependency graph (DAG) across functional roles.
-2. **Conflicting Specialist Evaluation:**  
+1. **Data-First Onboarding or Strategic Intake:**  
+   Ingest your company context by uploading unstructured Markdown documents (pitch decks, memos) or scraping any public corporate URL. The system automatically extracts 9 core business attributes with field-level provenance. Or immediately test our calibrated baseline (**NimbusDesk**, $110k MRR).
+2. **Conflicting Specialist Evaluation & Boardroom Dialogue:**  
    Specialist AI executives evaluate the scenario through their distinct charters:
    - **CFO:** Cash runway, gross margin, burn rate.
    - **Growth:** Top-of-funnel conversion, viral loops, CAC.
@@ -42,21 +42,24 @@
    - **Customer Success:** Support headcount capacity, churn risk.
    - **Product:** Feature tiering, usage ceilings, cannibalization.
    - **Skeptic:** Independent auditor dedicated solely to stress-testing peer assumptions.
+   - **Backup Analyst:** Autonomous failover worker ensuring resilience.
+   Executives can run the full 11-node orchestration or engage in **direct 1-on-1 dialogue** with any specialist inside the Cursor-themed Boardroom.
 3. **Empirical Conflict Resolution (No Voting):**  
    When the Growth agent advocates for a free plan but the CFO opposes it, they don't hold a popularity vote. The Supervisor isolates their disagreeing assumptions and runs parallel 12-month simulations to test which strategy preserves cash runway and net contribution.
 4. **Verified Deliverable & Executive Sign-Off:**  
-   A consolidated 10-section Decision Report is audited by 7 independent mathematical checks. The executive can approve, request changes, or reject the recommendation before it is saved to board records.
+   A consolidated Decision Report is audited by **15 independent algorithmic checks** (units, cash reconciliation, solvency constraints, number registry traceability). The executive can approve, request changes, or reject the recommendation before it is saved to board records.
 
 ---
 
-## 4. The 4 Big Differentiators (Why VentureTwin Wins)
+## 4. The 5 Big Differentiators (Why VentureTwin Wins)
 
 | What Typical AI Projects Do | What VentureTwin Does |
 |---|---|
-| **Single Agent / Generic Prompt:** One LLM attempts to answer complex business questions with generic text. | **Role-Specialized Swarm:** 6 autonomous agents evaluate the scenario with opposing departmental priorities. |
+| **Single Agent / Generic Prompt:** One LLM attempts to answer complex business questions with generic text. | **Role-Specialized Swarm & Direct Dialogue:** 7 autonomous agents evaluate scenarios with opposing departmental priorities, plus direct 1-on-1 chat. |
+| **Static / Hardcoded Demo Data:** Requires hand-editing complex JSON files. | **Data-First Onboarding Engine:** Ingests raw Markdown strategy memos or scrapes corporate websites into a multi-profile context store. |
 | **LLM Math Hallucinations:** AI outputs numbers like "$450k revenue" from thin air. | **Zero LLM Numbers:** LLMs only propose parameter ranges (`[low, base, high]`). 100% of dollars, runway, and margins come from deterministic Python simulations. |
 | **LLM Consensus via Voting:** Agents debate in a loop and vote on what sounds best. | **Simulation-Driven Resolution:** Disagreements are settled by running parallel 12-month financial models. |
-| **Fragile Workflows:** One API timeout or exception crashes the entire multi-agent run. | **Autonomous Fault Recovery:** Live chaos testing with multi-tier recovery (instant retries, failover to Backup Analyst, and real-time healing). |
+| **Fragile Workflows:** One API timeout or exception crashes the entire multi-agent run. | **Autonomous Fault Recovery & 15 Audits:** Multi-tier recovery (instant retries, backup failover) backed by 15 automated verification checks and 203 automated tests. |
 
 ---
 
@@ -94,7 +97,7 @@
 
 ### Q5: "Is the company data real or fake?"
 > **Your Answer:**  
-> *"For benchmark reproducibility, we built a realistic synthetic B2B SaaS company named **NimbusDesk** (Series A, \$1.32M ARR, \$1.65M cash balance). Every metric ties out with 100% mathematical consistency across ARR, MRR, customer counts, and cloud infrastructure costs. The entire platform is schema-agnostic and can ingest any real company dataset via standard JSON."*
+> *"VentureTwin supports both! With our **Data-First Onboarding Engine**, you can connect any real company in seconds by uploading Markdown documents (pitch decks, memos) or typing a corporate website URL. Our engine extracts 9 core business attributes with field-level provenance. For instant testing and benchmark reproducibility, we also provide **NimbusDesk** (Series A, \$1.32M ARR, \$1.65M cash balance), where every metric ties out with 100% mathematical consistency."*
 
 ### Q6: "Can you demonstrate fault injection right now?"
 > **Your Answer:**  
@@ -104,8 +107,8 @@
 
 ## 7. The 60-Second Demo Script
 
-1. **Intake (10s):** Show the Decision Console. Highlight the NimbusDesk operational baseline (\$110k MRR, 13.2mo runway). Select the query: *"Should we launch a free plan?"* and click **Run Simulation**.
-2. **Execution Graph (15s):** Point to Stage 1. Watch CFO, Growth, CTO, Customer, and Product evaluate in real-time telemetry over SSE. Click on any completed node to inspect raw assumptions.
-3. **Chaos Injection (15s):** Open the Chaos Testing panel. Inject a transient crash into CTO mid-run. Show the live event stream emit `agent_failed`, followed by autonomous `recovery_started (retry)` and the node completing as `Done (Retry 1)`.
-4. **Decision Report (20s):** Switch to the Decision Report tab. Highlight the **Scenario Outcome Matrix**, the **Tornado Sensitivity Analysis**, the **Empirical Conflict Resolution** table, the **7/7 Algorithmic Audits Passed**, and execute the **Executive Sign-Off Gate** (Approve / Reject).
+1. **Onboarding & Boardroom (15s):** Show the new **Connect Company Data** tab. Demonstrate uploading a strategy memo or scraping a website, or load the baseline profile. Click **`💬 Boardroom`** on the top right to show the Cursor dark theme panel and chat 1-on-1 directly with the CFO.
+2. **Decision Intake & Execution (15s):** Return to the Decision Console. Select the strategic query: *"Should we launch a free plan?"* and click **Run Simulation**. Watch the 11-node DAG execute parallel specialist waves over SSE.
+3. **Chaos Injection (10s):** Open the live chaos injection panel mid-run. Inject a transient crash into the CTO; show the live event stream emit `agent_failed`, followed by autonomous recovery and completion.
+4. **Decision Report & Sign-Off (20s):** Switch to the Decision Report tab. Highlight the **Scenario Outcome Matrix**, the **Tornado Sensitivity Analysis**, the **Empirical Conflict Resolution** table, the **15/15 Algorithmic Verification Checks**, and execute the **Human Executive Sign-Off Gate** (Approve / Reject).
 

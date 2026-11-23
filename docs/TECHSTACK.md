@@ -9,13 +9,23 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                             REACT 19 SPA (Vite 6)                           │
-│  [ Decision Console ]  [ Decision Report ]  [ Calibration ]  [ Company Graph] │
+│                       REACT 19 SPA (Vite 6, Cursor Dark Theme)              │
+│  [ Decision Console ] [ Connect Company Data ] [ Decision Report ]          │
+│  [ Calibration ]      [ Company Graph ]        [ 💬 Boardroom Panel (Chat) ]│
 └───────────────────────▲───────────────────────────────────────▲─────────────┘
-                        │ HTTP / JSON                           │ SSE Stream
+                        │ HTTP / JSON (Credentials Included)    │ SSE Stream
 ┌───────────────────────┴───────────────────────────────────────┴─────────────┐
 │                            FASTAPI BACKEND (Python 3.13)                    │
-│  REST Endpoints (/decisions, /inject-failure, /approve, /health, /history)  │
+│  REST: /auth/*, /company/*, /agents/chat, /decisions/*, /history, /graph    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                    SERVICES & DATA-FIRST ONBOARDING LAYER                   │
+│  ┌───────────────────────┐ ┌────────────────────────┐ ┌──────────────────┐  │
+│  │ Document Extractor    │ │ Website Scraper (SSRF) │ │ Context Store    │  │
+│  │ (9 Core SaaS Fields)  │ │ (Meta & DOM Ingestion) │ │ (Multi-Profile)  │  │
+│  └───────────────────────┴─┴────────────────────────┴─┴──────────────────┘  │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ Direct Agent Dialogue Engine: 1-on-1 Context-Grounded Specialist Chat │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                         SWARMFLOW ORCHESTRATION ENGINE                      │
 │  ┌───────────────────────┐ ┌────────────────────────┐ ┌──────────────────┐  │
@@ -35,7 +45,7 @@
 │  └─────────────────────────┘  └──────────────────────┘  └────────────────┘  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          VERIFICATION & NUMBER REGISTRY                     │
-│  7 Independent Algorithmic Audits • SHA-256 Hash • Zero-Hallucination Gate  │
+│  15 Independent Algorithmic Audits • SHA-256 Hash • Zero-Hallucination Gate │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -51,11 +61,13 @@
 | **Frontend Framework** | **React** | `19.0.0` | Concurrent rendering engine delivers butter-smooth 60fps UI updates during high-frequency live SSE telemetry bursts without layout thrashing. |
 | **Build Tool** | **Vite** | `6.4.5` | Instant HMR and lightning-fast sub-400ms production builds. Chosen over Next.js/Webpack to avoid unnecessary SSR complexity for an operational dashboard. |
 | **Type Safety** | **TypeScript** | `5.7.0` | Strict compilation ensures zero frontend runtime null-pointer exceptions across dynamic DAG task graphs and nested scenario tables. |
-| **Styling** | **Tailwind CSS** | `3.4.1` | Utility-first CSS compiling to a tiny ~20kB stylesheet with custom dark-mode executive telemetry themes. |
-| **Graph Visualization**| **React Flow / Custom**| `@xyflow/react`| Interactive node-and-edge graphs for the Company Intelligence Graph and Multi-Agent Orchestration DAG. |
-| **State Persistence** | **SQLite** | `Built-in` | Zero-configuration, file-backed ACID transactions. Saves task checkpoints after every state transition for crash resumption without external database dependencies. |
+| **Styling** | **Tailwind CSS** | `3.4.17` | Utility-first CSS compiling to a tiny ~20kB stylesheet with custom dark-mode executive telemetry themes (`#121212`, `#141414`). |
+| **Context Extraction**| **Document & Web Scraper**| `Custom Services`| Dual-mode Markdown document extraction + SSRF-protected website scraping to ground decision agents in real corporate profiles. |
+| **Direct Dialogue** | **Agent Chat Service**| `services/agent_chat.py`| Sub-second 1-on-1 interactive dialogue with all 7 executive personas grounded in active balance sheet and company context. |
+| **State Persistence** | **SQLite** | `Built-in` | Zero-configuration, file-backed ACID transactions for task checkpoints, user authentication, and company context profiles. |
 | **Telemetry Transport**| **Server-Sent Events**| `HTTP/1.1` | Native unidirectional browser streaming with automatic reconnect. Lower overhead and simpler proxy traversal than WebSockets for telemetry feeds. |
-| **Verification Gate** | **Custom AST Script** | `Node.js 22` | Custom pre-build regex and AST validator (`check-no-fake-numbers.mjs`) ensuring zero hardcoded simulation mock numbers in client code. |
+| **Testing Harness** | **Pytest / Pytest-Asyncio**| `9.2.0` / `0.25.3`| 203 automated tests covering DAG orchestration, conflict isolation, chaos fault recovery, company context ingestion, and direct agent dialogue. |
+| **Verification Gate** | **15 Algorithmic Audits** | `verification/verifier.py`| Automated 15-check mathematical validation suite enforcing balance sheet reconciliation, solvency floors, and zero hallucinated metrics. |
 
 ---
 

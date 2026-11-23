@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.162.2-009688.svg?logo=fastapi&logoColor=white" alt="FastAPI 0.162.2">
   <img src="https://img.shields.io/badge/React-19.0.0-61DAFB.svg?logo=react&logoColor=black" alt="React 19.0.0">
   <img src="https://img.shields.io/badge/TypeScript-5.7.0-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript 5.7.0">
-  <img src="https://img.shields.io/badge/Tests-189%20passed-brightgreen.svg" alt="189 Pytest Suite Passing">
+  <img src="https://img.shields.io/badge/Tests-203%20passed-brightgreen.svg" alt="203 Pytest Suite Passing">
   <img src="https://img.shields.io/badge/Verification-15%20Automated%20Checks-teal.svg" alt="15 Automated Verification Checks">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
 </p>
@@ -18,11 +18,12 @@
   <a href="#1-what-is-venturetwin"><b>Overview</b></a> •
   <a href="#3-venturetwin-architecture"><b>Architecture</b></a> •
   <a href="#4-meet-the-executive-agents"><b>Executive Agents</b></a> •
-  <a href="#6-what-makes-venturetwin-different"><b>Key Differentiators</b></a> •
-  <a href="#7-simulation-engine"><b>Simulation Engine</b></a> •
-  <a href="#8-product-tour--screenshots"><b>Product Tour</b></a> •
-  <a href="#10-quick-start"><b>Quick Start</b></a> •
-  <a href="#11-testing-and-reliability"><b>Reliability</b></a>
+  <a href="#5-interactive-boardroom--direct-dialogue"><b>Boardroom Chat</b></a> •
+  <a href="#6-data-first-onboarding-engine"><b>Data Onboarding</b></a> •
+  <a href="#7-what-makes-venturetwin-different"><b>Differentiators</b></a> •
+  <a href="#8-simulation-engine"><b>Simulation Engine</b></a> •
+  <a href="#11-quick-start"><b>Quick Start</b></a> •
+  <a href="#12-testing-and-reliability"><b>Reliability</b></a>
 </p>
 
 ---
@@ -31,33 +32,38 @@
 
 **VentureTwin** is an AI flight simulator and operational digital twin for SaaS founders, CEOs, and executive boards. When leadership evaluates strategic, high-stakes business questions—such as *"Should we launch a free plan?"* or *"What is our maximum affordable expenditure while protecting 10 months of runway?"*—traditional decision-making fractures between subjective opinions, siloed spreadsheets, and hallucinated LLM prose.
 
-VentureTwin orchestrates a virtual executive board of specialized AI agents (CFO, Growth, CTO, Customer Success, Product, and an adversarial Skeptic) over an **11-node Directed Acyclic Graph (DAG)**. Instead of generating ungrounded textual advice or taking a naive consensus vote, agents debate assumptions that feed directly into a deterministic Python financial simulation engine.
+VentureTwin unites two operational decision intelligence paradigms:
+
+1. **Whole Board Simulation (11-Node DAG):** Orchestrates a virtual executive team (CFO, Growth, CTO, Customer Success, Product, and an adversarial Skeptic) over a topological task graph. Agents debate bounded assumptions that feed directly into a deterministic Python financial simulation engine.
+2. **Interactive Boardroom & 1-on-1 Dialogue:** A Cursor-inspired executive console providing instant 1-on-1 direct dialogue with each specialist agent, grounded in real-time balance sheet telemetry and corporate context.
 
 > [!IMPORTANT]
 > **The Core Thesis:** *"Agents propose assumptions. Python calculates outcomes. Verification checks the decisions."*
 
 ```
-CEO Question ➔ Task Decomposition ➔ 11-Node DAG ➔ Parallel Specialists ➔ Adversarial Skeptic Audit
-➔ Empirical Simulation ➔ 15-Check Verification Gate ➔ Consolidated Report ➔ Human Executive Sign-off
+[ Data Onboarding: Markdown / URL ] ➔ [ Company Context Store ] ➔ [ Executive Boardroom (Chat or DAG) ]
+➔ [ 11-Node DAG ] ➔ [ Parallel Specialists ] ➔ [ Adversarial Audit ] ➔ [ Deterministic Simulation ]
+➔ [ 15-Check Verification Gate ] ➔ [ Consolidated Report ] ➔ [ Human Sign-Off Gate ]
 ```
 
 ---
 
 ## 2. The Problem
 
-High-stakes SaaS decisions fail under two common paradigms:
+High-stakes SaaS decisions fail under conventional decision frameworks:
 
 | Failure Mode | How It Fails in Practice | VentureTwin Solution |
 |:---|:---|:---|
-| **Human Executive Meetings** | Politicized debates, HiPPO bias (Highest Paid Person's Opinion), and static spreadsheet models that ignore cross-departmental friction. | **Autonomous Specialist Agents** evaluating decisions simultaneously across financial, technical, customer, and growth constraints. |
-| **Monolithic LLM Prompts** | Asking a single LLM generates plausible-sounding essays with hallucinated math, unvalidated arithmetic, and zero balance sheet accountability. | **Empirical Separation of Concerns:** LLMs propose bounded parameter assumptions `[low, base, high]`; deterministic Python runs the balance sheet. |
-| **Consensus / LLM Voting** | Averaging conflicting predictions (e.g., CFO's 1.0% conversion vs. Growth's 4.8% to 2.9%) yields an ungrounded compromise no expert supports. | **Simulation-Driven Resolution:** Dual 12-to-24 month dynamic simulations test whether parameter disagreements actually alter the optimal strategy. |
+| **Human Executive Meetings** | Politicized debates, HiPPO bias (Highest Paid Person's Opinion), and static spreadsheet models that ignore cross-departmental friction. | **Autonomous Specialist Swarm:** 7 dedicated agents evaluating decisions simultaneously across financial, infrastructure, retention, and growth constraints. |
+| **Monolithic LLM Prompts** | Asking a single LLM generates agreeable essays with fabricated math, unvalidated arithmetic, and zero balance sheet accountability. | **Empirical Separation of Concerns:** LLMs propose bounded parameter assumptions `[low, base, high]`; deterministic Python runs the balance sheet. |
+| **Consensus / LLM Voting** | Averaging conflicting predictions (e.g., CFO's 1.0% conversion vs. Growth's 4.8% to 2.9%) yields an ungrounded compromise no expert supports. | **Simulation-Driven Resolution:** Dual 12-to-24 month dynamic simulations test whether parameter disagreements actually flip the optimal strategic choice. |
+| **Hardcoded Assumptions** | Most tools require manually hardcoding synthetic company parameters into rigid config files. | **Data-First Onboarding:** Dynamic Markdown ingestion + SSRF-safe website scraper extracting 9 core business parameters with field-level provenance. |
 
 ---
 
 ## 3. VentureTwin Architecture
 
-VentureTwin coordinates multi-agent intelligence through a modular, decoupled architecture where qualitative reasoning and deterministic mathematics are strictly separated.
+VentureTwin coordinates multi-agent intelligence through a modular, decoupled architecture where qualitative reasoning, context extraction, and deterministic mathematics are strictly separated.
 
 <p align="center">
   <img src="docs/assets/readme/multi-agent-architecture.png" alt="VentureTwin Multi-Agent Architecture" width="100%">
@@ -65,7 +71,7 @@ VentureTwin coordinates multi-agent intelligence through a modular, decoupled ar
 
 ### The 11-Node Execution DAG
 
-Every incoming decision prompt is parsed into an 11-node execution graph executed across sequential dependency waves:
+Every full flight simulation prompt compiles into an 11-node execution graph executed across sequential dependency waves:
 
 ```mermaid
 flowchart TD
@@ -133,33 +139,45 @@ Each agent is an autonomous specialist operating with isolated context, a domain
   <img src="docs/assets/readme/executive-agent-board.png" alt="Executive Agent Board" width="100%">
 </p>
 
-| Agent | Implementation | Core Objective | Key Parameters Proposed | Private Tool Access |
-|:---|:---|:---|:---|:---|
-| **Supervisor** | [`orchestrator/supervisor.py`](orchestrator/supervisor.py) | Coordinates the DAG, detects conflicts, manages state, synthesizes findings. | State transitions, task graphs, loopback limits | Full Blackboard & SQLite State |
-| **CFO** | [`agents/specialists.py`](agents/specialists.py) | Defends cash runway (\$1.65M) and enforces solvency guardrails (10.0-mo floor). | `free_to_paid_conversion`, `infra_cost_per_user` | `company_financials`, `cash_burn_tool` |
-| **Growth** | [`agents/specialists.py`](agents/specialists.py) | Maximizes acquisition velocity, signup volume, and top-of-funnel expansion. | `monthly_free_signups`, `paid_funnel_lift` | `traffic_funnel_tool`, `conversion_history` |
-| **CTO** | [`agents/specialists.py`](agents/specialists.py) | Protects SLA stability, compute overhead, and infrastructure unit costs. | `infra_cost_per_free_user`, `usage_cap_reduction` | `infrastructure_costs`, `capacity_limits` |
-| **Customer** | [`agents/specialists.py`](agents/specialists.py) | Prevents customer churn, protects CSAT, and models support ticket burden. | `paid_to_free_cannibalization`, `ticket_rate` | `support_tickets_tool`, `churn_telemetry` |
-| **Product** | [`agents/specialists.py`](agents/specialists.py) | Designs tier boundaries, upgrade gating, and feature monetization elasticity. | `activation_drop_gating`, `cap_conversion_uplift` | `feature_usage_tool`, `tier_matrix` |
-| **Skeptic** | [`agents/specialists.py`](agents/specialists.py) | Adversarially stress-tests claims, applies confidence haircuts, challenges provenance. | Challenges optimistic assumptions, emits critiques | `provenance_audit_tool`, `cross_examiner` |
-| **Backup Analyst** | [`agents/backup_agent.py`](agents/backup_agent.py) | Autonomous failover agent activated upon specialist timeout or API rate limit. | Adaptive fallback parameter distributions | `domain_priors_tool`, `benchmarks` |
+| Agent | Implementation | Core Objective | Key Parameters Proposed | Private Tool Access | Direct 1-on-1 Chat |
+|:---|:---|:---|:---|:---|:---:|
+| **Supervisor** | [`orchestrator/supervisor.py`](orchestrator/supervisor.py) | Coordinates the DAG, detects conflicts, manages state, synthesizes findings. | State transitions, task graphs, loopback limits | Full Blackboard & SQLite State | Whole Board |
+| **CFO** | [`agents/specialists.py`](agents/specialists.py) | Defends cash runway (\$1.65M) and enforces solvency guardrails (10.0-mo floor). | `free_to_paid_conversion`, `infra_cost_per_user` | `company_financials`, `cash_burn_tool` | Yes (`cfo`) |
+| **Growth** | [`agents/specialists.py`](agents/specialists.py) | Maximizes acquisition velocity, signup volume, and top-of-funnel expansion. | `monthly_free_signups`, `paid_funnel_lift` | `traffic_funnel_tool`, `conversion_history` | Yes (`growth`) |
+| **CTO** | [`agents/specialists.py`](agents/specialists.py) | Protects SLA stability, compute overhead, and infrastructure unit costs. | `infra_cost_per_free_user`, `usage_cap_reduction` | `infrastructure_costs`, `capacity_limits` | Yes (`cto`) |
+| **Customer** | [`agents/specialists.py`](agents/specialists.py) | Prevents customer churn, protects CSAT, and models support ticket burden. | `paid_to_free_cannibalization`, `ticket_rate` | `support_tickets_tool`, `churn_telemetry` | Yes (`customer`) |
+| **Product** | [`agents/specialists.py`](agents/specialists.py) | Designs tier boundaries, upgrade gating, and feature monetization elasticity. | `activation_drop_gating`, `cap_conversion_uplift` | `feature_usage_tool`, `tier_matrix` | Yes (`product`) |
+| **Skeptic** | [`agents/specialists.py`](agents/specialists.py) | Adversarially stress-tests claims, applies confidence haircuts, challenges provenance. | Challenges optimistic assumptions, emits critiques | `provenance_audit_tool`, `cross_examiner` | Yes (`skeptic`) |
+| **Backup Analyst** | [`agents/backup_agent.py`](agents/backup_agent.py) | Autonomous failover agent activated upon specialist timeout or API rate limit. | Adaptive fallback parameter distributions | `domain_priors_tool`, `benchmarks` | Yes (`backup`) |
 
 ---
 
-## 5. How the Orchestration Works
+## 5. Interactive Boardroom & Direct Dialogue
 
-1. **Structured Pydantic Protocol:** Agents never exchange raw unstructured strings. All findings, critiques, and rebuttals are strictly validated Pydantic models (`Finding`, `Critique`, `Rebuttal`, `DiscussionMessage`) defined in [`state/schemas.py`](state/schemas.py).
-2. **Immutable Blackboard & SQLite Snapshots:** Every state transition is written to an append-only event stream via [`state/shared_state.py`](state/shared_state.py) and persisted to SQLite checkpoints via [`orchestrator/checkpointer.py`](orchestrator/checkpointer.py).
-3. **Bounded Rebuttal Debate:** The Skeptic reviews Wave 1 findings and issues formal critiques. Agents respond in a bounded single-round rebuttal to defend or adjust their bounds without infinite conversational loops.
-4. **Real-Time Telemetry:** The backend broadcasts real-time Server-Sent Events (SSE) via [`state/event_bus.py`](state/event_bus.py) to render live agent states, execution timings, and node telemetry on the frontend.
-5. **3-Tier Fault Recovery:**
-   - *Tier 1:* Exponential backoff retries (2s, 4s, 8s) on LLM rate limits (HTTP 429).
-   - *Tier 2:* Failover to autonomous `BackupAnalystAgent` ([`agents/backup_agent.py`](agents/backup_agent.py)).
-   - *Tier 3:* Deterministic domain priors from [`data/benchmarks.json`](data/benchmarks.json) with permanent `DEGRADED` disclaimers.
+The **Executive Boardroom** ([`ui/src/components/mission/BoardroomPanel.tsx`](ui/src/components/mission/BoardroomPanel.tsx)) provides a Cursor-inspired sliding panel on the right side of the workspace:
+
+- **Mode Selector (Downward-Opening Dropdown):** Seamlessly toggle between **Whole Board (11-Node DAG)** full orchestration and private **1-on-1 Direct Dialogue** with any of the 7 executive specialists.
+- **Dynamic Context Grounding:** Every direct conversation is automatically grounded in the active company's balance sheet, MRR, cash reserves, and unit economics via [`services/agent_chat.py`](services/agent_chat.py).
+- **Sub-Second Streaming:** Real-time typewriter pacing and conversation history for iterative strategy stress-testing.
+
+> 📖 **Deep Dive:** Read [`docs/BOARDROOM.md`](docs/BOARDROOM.md) for full persona prompts, grounding mechanics, and API details.
 
 ---
 
-## 6. What Makes VentureTwin Different?
+## 6. Data-First Onboarding Engine
+
+Rather than forcing users into hardcoded demonstration files, VentureTwin features a **Data-First Onboarding Engine**:
+
+- **Markdown Document Ingestion ([`services/company_extractor.py`](services/company_extractor.py)):** Drag and drop corporate strategy memos, pitch decks, or financial updates. An automated extractor parses 9 core fields (`company_name`, `industry`, `business_model`, `description`, `products_services`, `target_customers`, `revenue_model`, `stage`, `strategic_goals`).
+- **SSRF-Protected Website Scraper ([`services/website_scraper.py`](services/website_scraper.py)):** Enter any corporate website URL. The engine crawls public metadata, headers, and positioning with comprehensive private IP and loopback guards.
+- **Context Store & Multi-Profile Persistence ([`services/company_context_store.py`](services/company_context_store.py)):** Extracted company contexts are stored in SQLite (`venturetwin_company_context.db`), with verified field provenance tags (`uploaded_documents`, `website_scrape`, `manual_edit`).
+- **NimbusDesk Reference Baseline ([`data/loader.py`](data/loader.py)):** If no custom context is connected, the platform seamlessly defaults to the verified Series A benchmark for instant evaluation.
+
+> 📖 **Deep Dive:** Read [`docs/DATA_ONBOARDING.md`](docs/DATA_ONBOARDING.md) for full extraction schemas, SSRF rules, and API specifications.
+
+---
+
+## 7. What Makes VentureTwin Different?
 
 <p align="center">
   <img src="docs/assets/readme/conflict-resolution.png" alt="Empirical Simulation vs Subjective Voting" width="100%">
@@ -173,9 +191,9 @@ Each agent is an autonomous specialist operating with isolated context, a domain
 
 ---
 
-## 7. Simulation Engine
+## 8. Simulation Engine
 
-VentureTwin evaluates strategy branches against a realistic synthetic B2B SaaS benchmark: **NimbusDesk (Series A)**.
+VentureTwin evaluates strategy branches against dynamic company profiles or the calibrated Series A benchmark: **NimbusDesk**.
 
 <p align="center">
   <img src="docs/assets/readme/simulation-engine.png" alt="VentureTwin Simulation Engine" width="100%">
@@ -207,7 +225,7 @@ All charts are generated deterministically from verified simulation runs (seed=4
 
 ---
 
-## 8. Product Tour & Screenshots
+## 9. Product Tour & Screenshots
 
 The VentureTwin React dashboard provides end-to-end visibility into the multi-agent decision lifecycle:
 
@@ -238,7 +256,7 @@ The VentureTwin React dashboard provides end-to-end visibility into the multi-ag
 
 ---
 
-## 9. Technology Stack
+## 10. Technology Stack
 
 Verified directly from [`pyproject.toml`](pyproject.toml) and [`ui/package.json`](ui/package.json):
 
@@ -248,17 +266,18 @@ Verified directly from [`pyproject.toml`](pyproject.toml) and [`ui/package.json`
 | **API Framework** | FastAPI | `0.162.2` | High-performance asynchronous REST & SSE streaming server |
 | **ASGI Server** | Uvicorn | `0.54.0` | Production ASGI web application server |
 | **Type Validation** | Pydantic | `2.14.3` | Bounded parameter schemas, finding models, contract enforcement |
+| **Services Layer** | Custom Services | `services/` | Context extraction, website scraping, multi-profile store & agent chat |
 | **Scientific Math** | NumPy / SciPy | `2.5.4` / `1.18.1` | Monte Carlo distributions, quantile calculations, sensitivity sweeps |
 | **Async HTTP** | HTTPX | `0.28.1` | Non-blocking LLM provider communications with retry management |
-| **Test Harness** | Pytest / Pytest-Asyncio | `9.2.0` / `0.25.3` | 189 unit, integration, invariant, and chaos tests |
-| **Frontend UI** | React / React-DOM | `19.0.0` | Mission-control reactive user interface component tree |
-| **Frontend Tooling** | Vite / TypeScript | `6.2.0` / `5.7.0` | Lightning-fast HMR bundler and strict end-to-end type contracts |
-| **UI Styling** | Tailwind CSS | `3.4.17` | Dark-mode mission-control design system |
-| **Persistence** | SQLite | `3.x` | Zero-dependency transactional checkpoint and event store |
+| **Test Harness** | Pytest / Pytest-Asyncio | `9.2.0` / `0.25.3` | 203 unit, integration, invariant, onboarding, and chaos tests |
+| **Frontend UI** | React / React-DOM | `19.0.0` | Cursor-inspired reactive mission-control interface |
+| **Frontend Tooling** | Vite / TypeScript | `6.4.5` / `5.7.0` | Lightning-fast HMR bundler and strict end-to-end type contracts |
+| **UI Styling** | Tailwind CSS | `3.4.17` | Obsidian dark-mode design system (`#121212`, `#141414`) |
+| **Persistence** | SQLite | `3.x` | Checkpoints, executive auth, and company context stores |
 
 ---
 
-## 10. Quick Start
+## 11. Quick Start
 
 Run VentureTwin locally in **mock mode** with zero external API keys required:
 
@@ -281,6 +300,7 @@ pip install -r requirements.txt
 ```bash
 cd ui
 npm install
+npm run build
 cd ..
 ```
 
@@ -290,11 +310,11 @@ cd ..
 # Terminal 1: Launch FastAPI Backend (Defaults to Mock Mode)
 uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
 
-# Terminal 2: Launch React Frontend
+# Terminal 2: Launch React Frontend (For Live HMR Development)
 npm --prefix ui run dev
 ```
 
-Open **`http://localhost:5173`** in your browser. Verify backend health with:
+Open **`http://localhost:5173`** (or **`http://localhost:8000`**) in your browser. Verify backend health with:
 
 ```bash
 curl http://localhost:8000/api/health
@@ -323,14 +343,14 @@ python3 scripts/check_provider.py
 
 ---
 
-## 11. Testing and Reliability
+## 12. Testing and Reliability
 
-VentureTwin maintains rigorous automated testing and algorithmic verification:
+VentureTwin maintains rigorous automated testing and algorithmic verification across 203 automated tests:
 
 ```bash
 # Execute the complete automated test suite
 pytest tests/ -q
-# 189 passed, 3 skipped in 16.33s
+# 203 passed, 3 skipped in 16.56s
 ```
 
 ### The 15 Algorithmic Verification Checks
@@ -359,26 +379,32 @@ node ui/scripts/check-no-fake-numbers.mjs
 
 ---
 
-## 12. Limitations
+## 13. Limitations & Roadmap
 
-1. **Synthetic Benchmark Focus:** NimbusDesk is a calibrated synthetic B2B SaaS company (\$110k MRR, \$1.65M cash) designed for consistent benchmarking. It is not connected to a live production database.
-2. **SaaS Dynamics Scope:** The deterministic model specializes in subscription economics (churn, CAC, ARPU, support load, infra scaling). It is not designed for hardware manufacturing, crypto, or biotech modeling.
-3. **Simulations are Scenarios, Not Guarantees:** Monte Carlo distributions project mathematical outcomes of stated assumptions under statistical distributions; they are decision stress-tests, not macroeconomic forecasts.
-4. **Single-Tenant Local Execution:** Optimized for local hackathon evaluation with SQLite; does not include enterprise multi-tenant RBAC or cloud SSO.
+### Transparent Limitations
+1. **SaaS Dynamics Focus:** The deterministic model specializes in subscription economics (churn, CAC, ARPU, support load, infra scaling). It is not designed for hardware manufacturing, crypto, or biotech modeling.
+2. **Scenarios, Not Crystal Balls:** Monte Carlo distributions project mathematical outcomes of stated assumptions under statistical distributions; they are decision stress-tests, not macroeconomic forecasts.
+3. **Single-Tenant Local Execution:** Optimized for local evaluation with SQLite; does not include enterprise multi-tenant cloud SSO.
 
----
-
-## 13. Future Scope
-
-- `[PLANNED]` **Live Billing & CRM Telemetry:** Native connectors for Stripe, HubSpot, and Datadog to auto-sync company parameters.
-- `[PLANNED]` **Multi-Tenant Enterprise Workspaces:** Role-based access control allowing cross-functional executive teams to collaborate and sign off.
-- `[PLANNED]` **Historical Decision Backtesting:** Comparing past simulated recommendations against actual company performance to dynamically calibrate agent confidence weights.
-- `[PLANNED]` **Conversational Scenario Steering:** Direct dialogue with individual specialist agents within the console to stress-test micro-assumptions.
+### Implemented vs. Planned Capabilities
+- `[IMPLEMENTED]` **Data-First Onboarding:** Automated Markdown parsing and SSRF-safe website scraper.
+- `[IMPLEMENTED]` **Direct Agent Dialogue:** 1-on-1 grounded executive chat in the Cursor Boardroom panel.
+- `[IMPLEMENTED]` **Executive Authentication:** PBKDF2-SHA256 password hashing with 30-day session persistence.
+- `[PLANNED]` **Live Stripe & CRM Telemetry Connectors:** Direct real-time sync with Stripe, HubSpot, and Datadog APIs.
+- `[PLANNED]` **Autonomous Decision Backtesting:** Comparing past simulated recommendations against actual company performance to dynamically calibrate agent confidence weights.
 
 ---
 
-## 14. Team and Acknowledgements
+## 14. Key Documentation & Team
 
+### Documentation Hub
+- **[`docs/PITCH.md`](docs/PITCH.md)** — **Executive Pitch & Judge Q&A Guide:** 3-minute plain-English walkthrough with judge questions and sharp answers.
+- **[`docs/TECHSTACK.md`](docs/TECHSTACK.md)** — **Tech Stack & Engineering Tradeoffs:** Detailed justifications, communication protocols, and empirical conflict resolution.
+- **[`docs/DATA_ONBOARDING.md`](docs/DATA_ONBOARDING.md)** — **Data-First Onboarding Guide:** Markdown ingestion, SSRF-safe scraper, and context store architecture.
+- **[`docs/BOARDROOM.md`](docs/BOARDROOM.md)** — **Executive Boardroom Specification:** Whole Board DAG coordination vs direct 1-on-1 agent dialogue.
+- **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — **Complete Technical Specification:** Comprehensive system architecture specification.
+
+### Team & Acknowledgements
 - **Built by:** Om Rajput ([@omsrajput977](https://github.com/omsrajput977))
 - **Submission for:** *SwarmFlow: Multi-Agent Task Coordination Engine Hackathon (2026)*
 - **License:** Open source under the **[MIT License](LICENSE)**.
