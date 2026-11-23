@@ -157,8 +157,8 @@ export const AgentIntegrationCard: React.FC<AgentIntegrationCardProps> = ({
         </div>
       </div>
 
-      {/* Integration cards — 2-col on larger, stacked on mobile */}
-      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Integration cards — clean vertical stack inside each executive card */}
+      <div className="p-3.5 space-y-2.5">
         {integrations.map((integ) => {
           const st = mergedStatuses(integ.connectorId);
           const err = errors[integ.connectorId];

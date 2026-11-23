@@ -167,7 +167,7 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
       {/* SECTION 2: Executive Agent Integration Connectors */}
       <section className="space-y-4 pt-6 border-t border-[#242424]">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#cccccc]">
               Executive Agent Operational Connectors
             </h2>

@@ -50,9 +50,9 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, errorMsg, missingVars
     : errorMsg ?? '';
 
   return (
-    <div className="relative inline-flex">
+    <div className="relative inline-flex flex-shrink-0">
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border select-none ${cfg.cls} ${hasTooltip ? 'cursor-help' : ''}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border select-none whitespace-nowrap ${cfg.cls} ${hasTooltip ? 'cursor-help' : ''}`}
         onMouseEnter={() => hasTooltip && setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
@@ -60,7 +60,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, errorMsg, missingVars
         <span>{cfg.label}</span>
       </span>
       {showTooltip && tooltipContent && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-max max-w-xs bg-[#1a1a1a] border border-[#333333] rounded-lg px-3 py-2 text-[10px] font-mono text-[#cccccc] shadow-xl whitespace-pre-wrap">
+        <div className="absolute bottom-full right-0 mb-2 z-50 w-max max-w-xs bg-[#1a1a1a] border border-[#333333] rounded-lg px-3 py-2 text-[10px] font-mono text-[#cccccc] shadow-xl whitespace-pre-wrap">
           {tooltipContent}
         </div>
       )}
@@ -77,7 +77,7 @@ const EnvChip: React.FC<{ env: string }> = ({ env }) => {
     DEVELOPER:  'text-blue-400 border-blue-800 bg-blue-950',
   };
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${cls[upper] ?? 'text-[#888888] border-[#333333] bg-[#1a1a1a]'}`}>
+    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border whitespace-nowrap ${cls[upper] ?? 'text-[#888888] border-[#333333] bg-[#1a1a1a]'}`}>
       {upper}
     </span>
   );
@@ -107,22 +107,24 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
   const awaitingCreds = st === 'awaiting_credentials';
 
   return (
-    <div className="bg-[#181818] border border-[#242424] rounded-xl p-3.5 space-y-3 hover:border-[#333333] transition-colors">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <span className="text-xs font-semibold text-[#e0e0e0] block truncate">{displayName}</span>
-          <p className="text-[10px] text-[#777777] mt-0.5 leading-relaxed line-clamp-2">{description}</p>
-        </div>
-        <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-          <StatusBadge
-            status={st}
-            errorMsg={status?.error ?? null}
-            missingVars={status?.missing_env_vars ?? []}
-          />
+    <div className="bg-[#181818] border border-[#242424] rounded-xl p-3 space-y-2 hover:border-[#333333] transition-colors">
+      {/* Header Row: Title & Environment Chip on Left, Status Badge on Right */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <span className="text-xs font-bold text-[#e5e5e5] whitespace-nowrap">{displayName}</span>
           {status?.environment && <EnvChip env={status.environment} />}
         </div>
+        <StatusBadge
+          status={st}
+          errorMsg={status?.error ?? null}
+          missingVars={status?.missing_env_vars ?? []}
+        />
       </div>
+
+      {/* Description */}
+      <p className="text-[11px] text-[#888888] leading-snug line-clamp-2">
+        {description}
+      </p>
 
       {/* Last Sync */}
       {isConnected && status?.last_sync !== undefined && (
@@ -133,7 +135,7 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
 
       {/* Awaiting credentials callout */}
       {awaitingCreds && status && status.missing_env_vars.length > 0 && (
-        <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 space-y-1">
+        <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2 space-y-1">
           <p className="text-[10px] text-amber-400 font-semibold">Missing environment variables:</p>
           <div className="flex flex-wrap gap-1">
             {status.missing_env_vars.map((v) => (
@@ -150,14 +152,14 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
         <div className="text-[10px] text-[#555555] italic">Backend unavailable — status unknown</div>
       )}
 
-      {/* Action buttons */}
-      <div className="flex flex-wrap gap-1.5 pt-1">
+      {/* Action buttons row */}
+      <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
         {/* Connect */}
         {!isConnected && !awaitingCreds && st !== 'connecting' && (
           <button
             onClick={onConnect}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-lg bg-purple-700 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-lg bg-purple-700 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition cursor-pointer shadow-sm"
           >
             {isLoading ? <Spinner /> : null}
             Connect
@@ -166,7 +168,7 @@ export const IntegrationConnectorCard: React.FC<IntegrationConnectorCardProps> =
 
         {/* Connecting indicator */}
         {st === 'connecting' && (
-          <span className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">
+          <span className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">
             <Spinner /> Connecting…
           </span>
         )}
