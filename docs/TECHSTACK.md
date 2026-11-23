@@ -10,8 +10,8 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       REACT 19 SPA (Vite 6, Cursor Dark Theme)              │
-│  [ Decision Console ] [ Connect Company Data ] [ Decision Report ]          │
-│  [ Calibration ]      [ Company Graph ]        [ 💬 Boardroom Panel (Chat) ]│
+│  [ Decision Console ] [ Decision Report ] [ Calibration ] [ Company Graph ] │
+│  [ + Connect Company Data Flow ]          [ 💬 Boardroom Panel (Chat) ]     │
 └───────────────────────▲───────────────────────────────────────▲─────────────┘
                         │ HTTP / JSON (Credentials Included)    │ SSE Stream
 ┌───────────────────────┴───────────────────────────────────────┴─────────────┐

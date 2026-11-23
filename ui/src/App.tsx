@@ -349,16 +349,6 @@ export const App: React.FC = () => {
                 Decision Console
               </button>
               <button
-                onClick={() => setActiveTab('connect')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer font-sans ${
-                  activeTab === 'connect'
-                    ? 'text-white font-bold bg-[#262626] shadow-sm'
-                    : 'text-[#888888] hover:text-[#e0e0e0] hover:bg-[#1e1e1e]'
-                }`}
-              >
-                Connect Company Data
-              </button>
-              <button
                 disabled={!isDataConnected || !hasGivenPrompt || (workflowStatus === 'running' && !report)}
                 onClick={handleOpenReport}
                 title={
@@ -634,17 +624,10 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* 3. Cursor IDE Bottom Status Bar */}
+      {/* 3. Bottom Status Bar */}
       <footer className="h-7 bg-[#141414] border-t border-[#242424] px-3 flex items-center justify-between text-[11px] font-mono text-[#777777] select-none shrink-0 z-30">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-purple-400 font-semibold">
-            <span>⬡</span>
-            <span>Cursor Tab</span>
-          </span>
-          <span className="text-[#333333]">|</span>
-          <span>→ Tab Stats: 100% Verified</span>
-          <span className="text-[#333333] hidden sm:inline">|</span>
-          <span className="hidden sm:inline">
+          <span>
             Boardroom: {isDataConnected ? `${model.activeAgentsCount}/7 Active` : 'Awaiting Data'}
           </span>
         </div>
@@ -663,13 +646,6 @@ export const App: React.FC = () => {
           <span className="text-[#333333] hidden md:inline">|</span>
           <span className="text-purple-400/90 font-medium">
             LLM_MODE={health?.llm_mode || 'mock'}
-          </span>
-          <span className="text-[#333333]">|</span>
-          <span className="hover:text-[#cccccc] cursor-pointer" title="No commit scored">
-            No commit scored
-          </span>
-          <span className="hover:text-[#cccccc] cursor-pointer" title="Notifications">
-            🔔
           </span>
         </div>
       </footer>
