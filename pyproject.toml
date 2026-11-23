@@ -25,7 +25,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agents*", "api*", "conflict*", "orchestrator*", "report*", "services*", "simulation*", "state*", "verification*"]
+include = ["agents*", "api*", "conflict*", "integrations*", "orchestrator*", "report*", "services*", "simulation*", "state*", "verification*"]
 exclude = ["ui*", "tests*", "docs*", "scripts*"]
 
 [tool.pytest.ini_options]

@@ -404,3 +404,98 @@ export async function chatWithAgent(
   return res.json();
 }
 
+// ---- Integration Connectors ----
+
+export type ConnectorStatus =
+  | 'not_connected'
+  | 'connecting'
+  | 'connected'
+  | 'syncing'
+  | 'error'
+  | 'sandbox_connected'
+  | 'awaiting_credentials';
+
+export interface ConnectorStatusInfo {
+  connector_id: string;
+  display_name: string;
+  status: ConnectorStatus;
+  environment: string; // sandbox | test | developer | production
+  last_sync: string | null;
+  error: string | null;
+  agent_domain: string;
+  supports_write: boolean;
+  supports_synthetic_generation: boolean;
+  awaiting_credentials: boolean;
+  missing_env_vars: string[];
+}
+
+export interface IntegrationSyncResult {
+  connector_id: string;
+  sync_start: string;
+  sync_end: string | null;
+  records_fetched: number;
+  records_created: number;
+  status: string;
+  error_message: string | null;
+}
+
+export async function fetchAllConnectorStatuses(): Promise<ConnectorStatusInfo[]> {
+  const res = await fetch(`${API_BASE}/integrations/status`, {
+    credentials: 'include',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to fetch integration statuses');
+  return res.json();
+}
+
+export async function fetchConnectorStatus(connectorId: string): Promise<ConnectorStatusInfo> {
+  const res = await fetch(`${API_BASE}/integrations/status/${connectorId}`, {
+    credentials: 'include',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(`Failed to fetch status for ${connectorId}`);
+  return res.json();
+}
+
+export async function connectIntegration(connectorId: string): Promise<ConnectorStatusInfo> {
+  const res = await fetch(`${API_BASE}/integrations/connect/${connectorId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(`Failed to connect ${connectorId}`);
+  return res.json();
+}
+
+export async function disconnectIntegration(connectorId: string): Promise<void> {
+  await fetch(`${API_BASE}/integrations/disconnect/${connectorId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders()
+  });
+}
+
+export async function syncIntegration(connectorId: string): Promise<IntegrationSyncResult> {
+  const res = await fetch(`${API_BASE}/integrations/sync/${connectorId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders()
+  });
+  if (!res.ok) throw new Error(`Failed to sync ${connectorId}`);
+  return res.json();
+}
+
+export async function generateSyntheticData(
+  connectorId: string,
+  companyProfile: Record<string, unknown>
+): Promise<{ records_created: number; message: string }> {
+  const res = await fetch(`${API_BASE}/integrations/generate/${connectorId}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ company_profile: companyProfile })
+  });
+  if (!res.ok) throw new Error(`Failed to generate synthetic data for ${connectorId}`);
+  return res.json();
+}
+

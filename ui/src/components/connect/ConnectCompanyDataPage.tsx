@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { CompanyContextCard } from './CompanyContextCard';
+import { AgentIntegrationCard } from './AgentIntegrationCard';
 import {
   CompanyContextRecord,
+  ConnectorStatusInfo,
   fetchActiveCompanyContext,
   fetchCompanyContexts,
-  deleteCompanyContext
+  deleteCompanyContext,
+  fetchAllConnectorStatuses,
 } from '../../api';
 
 interface ConnectCompanyDataPageProps {
@@ -19,10 +22,13 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
   const [activeContext, setActiveContext] = useState<CompanyContextRecord | null>(null);
   const [allContexts, setAllContexts] = useState<CompanyContextRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectorStatuses, setConnectorStatuses] = useState<ConnectorStatusInfo[]>([]);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   // Load saved context on mount
   useEffect(() => {
     loadContexts();
+    loadConnectorStatuses();
   }, []);
 
   const loadContexts = async () => {
@@ -40,6 +46,19 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
       console.error('Failed loading saved company context:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadConnectorStatuses = async () => {
+    setStatusLoading(true);
+    try {
+      const statuses = await fetchAllConnectorStatuses();
+      setConnectorStatuses(statuses);
+    } catch (err) {
+      // Backend may be unavailable; leave statuses empty for graceful degradation
+      console.warn('Integration status unavailable:', err);
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -145,70 +164,116 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
         />
       </section>
 
-      {/* SECTION 2: Integration Page Expansion (Future Executive Agent Connectors) */}
+      {/* SECTION 2: Executive Agent Integration Connectors */}
       <section className="space-y-4 pt-6 border-t border-[#242424]">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#cccccc]">
               Executive Agent Operational Connectors
             </h2>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#222222] text-[#888888] border border-[#333333]">
-              Upcoming Architecture
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-purple-900/40 text-purple-300 border border-purple-700/50">
+              Active Integration Connectors
             </span>
           </div>
           <p className="text-xs text-[#666666] mt-1">
-            Once Company Context is established, individual executive agents can be paired with domain-specific live data connectors.
+            Connect live data sources to each executive agent to power real-time analysis.
           </p>
         </div>
 
-        {/* 6 Reserved Integration Slots */}
+        {statusLoading && (
+          <div className="text-xs text-[#555555] font-mono flex items-center gap-2">
+            <svg className="animate-spin h-3 w-3 text-purple-400" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading connector statuses…
+          </div>
+        )}
+
+        {/* 6 Agent Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="cfo"
             agentName="CFO"
-            title="Financial Data"
-            domainDescription="Cash reserves, net burn, runway months, gross margins, accounting ledgers, and expense structures."
-            requiredTelemetry={['cash_balance', 'runway_months', 'mrr', 'gross_margin']}
+            agentIcon="💼"
+            agentRole="Chief Financial Officer"
+            agentColor="text-emerald-400"
+            integrations={[
+              { connectorId: 'stripe', displayName: 'Stripe', description: 'Payments, subscriptions, invoices & customer billing data' },
+              { connectorId: 'quickbooks', displayName: 'QuickBooks', description: 'Accounting ledgers, P&L, balance sheet & expense structures' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
 
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="growth"
             agentName="Growth"
-            title="Marketing & Sales Data"
-            domainDescription="Acquisition funnels, visitor-to-paid conversion rates, blended CAC, and marketing channel telemetry."
-            requiredTelemetry={['monthly_visitors', 'trial_signups', 'trial_to_paid_conversion']}
+            agentIcon="📈"
+            agentRole="VP Growth & CMO"
+            agentColor="text-cyan-400"
+            integrations={[
+              { connectorId: 'hubspot', displayName: 'HubSpot', description: 'CRM contacts, deals, pipelines & marketing activity' },
+              { connectorId: 'ga4', displayName: 'Google Analytics 4', description: 'Website sessions, conversions, acquisition & engagement' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
 
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="cto"
             agentName="CTO"
-            title="Engineering & Infrastructure Data"
-            domainDescription="Cloud compute expenses, server hosting bills, infrastructure cost per active user, and uptime SLAs."
-            requiredTelemetry={['monthly_cloud_cost', 'infra_cost_per_paid_user']}
+            agentIcon="⚡"
+            agentRole="Chief Technology Officer"
+            agentColor="text-amber-400"
+            integrations={[
+              { connectorId: 'github', displayName: 'GitHub', description: 'Commits, PRs, issues, releases & engineering velocity' },
+              { connectorId: 'cloudwatch', displayName: 'AWS CloudWatch', description: 'Infrastructure metrics, uptime, latency & resource utilization' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
 
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="customer"
             agentName="Customer Success"
-            title="Customer & Support Data"
-            domainDescription="Monthly customer churn rate, retention cohorts, support ticket volume, and agent resolution load."
-            requiredTelemetry={['paying_customers', 'monthly_churn_rate', 'support_headcount']}
+            agentIcon="🤝"
+            agentRole="VP Customer Success"
+            agentColor="text-indigo-400"
+            integrations={[
+              { connectorId: 'intercom', displayName: 'Intercom', description: 'Customer contacts, conversations & support interactions' },
+              { connectorId: 'zendesk', displayName: 'Zendesk', description: 'Support tickets, resolution times & satisfaction scores' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
 
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="product"
             agentName="Product"
-            title="Product Analytics Data"
-            domainDescription="Feature engagement frequency, plan tier usage matrices, and self-serve upgrade velocities."
-            requiredTelemetry={['tier_distribution', 'feature_utilization']}
+            agentIcon="📦"
+            agentRole="Chief Product Officer"
+            agentColor="text-pink-400"
+            integrations={[
+              { connectorId: 'posthog', displayName: 'PostHog', description: 'Product analytics, feature adoption & user retention' },
+              { connectorId: 'linear', displayName: 'Linear', description: 'Issues, roadmap, cycles & product development velocity' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
 
-          <FutureConnectorSlot
+          <AgentIntegrationCard
             agentKey="skeptic"
             agentName="Skeptic"
-            title="External Market Intelligence"
-            domainDescription="Competitor pricing benchmarks, macroeconomic volatility indices, and market saturation data."
-            requiredTelemetry={['competitor_pricing_matrix', 'macro_volatility_index']}
+            agentIcon="🛡️"
+            agentRole="Independent Risk Auditor"
+            agentColor="text-rose-400"
+            integrations={[
+              { connectorId: 'firecrawl', displayName: 'Firecrawl', description: 'Real-time competitor website scraping & public pricing data' },
+              { connectorId: 'tavily', displayName: 'Tavily', description: 'Market intelligence, competitor developments & industry benchmarks' }
+            ]}
+            connectorStatuses={connectorStatuses}
+            companyProfile={(activeContext ?? {}) as Record<string, unknown>}
           />
         </div>
       </section>
@@ -216,47 +281,3 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
   );
 };
 
-// Reserved slot component for upcoming executive agent integrations
-const FutureConnectorSlot: React.FC<{
-  agentKey: string;
-  agentName: string;
-  title: string;
-  domainDescription: string;
-  requiredTelemetry: string[];
-}> = ({ agentName, title, domainDescription, requiredTelemetry }) => {
-  return (
-    <div className="bg-[#161616] border border-dashed border-[#2d2d2d] rounded-2xl p-4 space-y-3 opacity-80 hover:opacity-100 transition">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-lg bg-[#222222] border border-[#333333] flex items-center justify-center text-[10px] font-mono font-bold text-purple-300">
-            {agentName}
-          </span>
-          <span className="text-xs font-bold text-[#e0e0e0]">{title}</span>
-        </div>
-        <span className="text-[10px] font-mono text-[#666666] bg-[#1a1a1a] px-2 py-0.5 rounded border border-[#2a2a2a]">
-          Pending
-        </span>
-      </div>
-
-      <p className="text-[11px] text-[#888888] leading-relaxed">
-        {domainDescription}
-      </p>
-
-      <div className="pt-2 border-t border-[#222222] flex flex-wrap gap-1">
-        {requiredTelemetry.map((item) => (
-          <span
-            key={item}
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#1c1c1c] text-[#777777] border border-[#262626]"
-          >
-            {item}
-          </span>
-        ))}
-      </div>
-
-      <div className="pt-1 flex items-center justify-between text-[10px] text-[#555555] font-mono">
-        <span>Slot Reserved</span>
-        <span>Awaiting Configuration</span>
-      </div>
-    </div>
-  );
-};

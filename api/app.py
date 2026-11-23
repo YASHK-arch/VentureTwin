@@ -56,12 +56,15 @@ from state.event_bus import EventBus
 from orchestrator.parser import parse_decision_query
 from orchestrator.supervisor import Supervisor
 from orchestrator.checkpointer import SQLiteCheckpointer
+from integrations.api_routes import router as integrations_router
 
 app = FastAPI(
     title="VentureTwin API",
     description="Operational Digital Twin & AI Flight Simulator for SaaS CEOs",
     version="0.1.0"
 )
+
+app.include_router(integrations_router)
 
 DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://localhost:3000"
 cors_origins_env = os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
