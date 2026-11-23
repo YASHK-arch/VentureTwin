@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 
 from integrations.registry import registry, manager
+from integrations.base import ConnectionStatus
 from integrations.store import (
     save_connection_state,
     save_sync_record,
@@ -30,6 +31,61 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 class GenerateSyntheticRequest(BaseModel):
     company_profile: Optional[Dict[str, Any]] = Field(default_factory=dict)
     count: Optional[int] = 50
+
+
+class NangoSessionRequest(BaseModel):
+    company_id: Optional[str] = "default"
+    allowed_integrations: Optional[List[str]] = None
+
+
+class NangoCallbackRequest(BaseModel):
+    connection_id: str
+    provider_config_key: str
+    company_id: Optional[str] = "default"
+
+
+@router.post("/nango/session-token")
+async def create_nango_session(req: NangoSessionRequest) -> Dict[str, Any]:
+    """Generates a short-lived Connect Session token from Nango for the frontend modal."""
+    from integrations.nango_service import nango_service
+    return await nango_service.create_connect_session(
+        company_id=req.company_id or "default",
+        allowed_integrations=req.allowed_integrations
+    )
+
+
+@router.post("/nango/callback")
+async def handle_nango_callback(req: NangoCallbackRequest) -> Dict[str, Any]:
+    """Handles Nango OAuth completion callback and saves connection metadata."""
+    from integrations.nango_service import nango_service
+    connector = registry.get_connector(req.provider_config_key)
+    conn_meta = await nango_service.get_connection(req.connection_id, req.provider_config_key) or {}
+
+    status = "connected"
+    if connector and connector.config.environment in ("sandbox", "test"):
+        status = "sandbox_connected"
+
+    saved = save_connection_state(
+        connector_id=req.provider_config_key,
+        status=status,
+        credentials_configured=True,
+        company_id=req.company_id or "default",
+        provider_name=connector.config.display_name if connector else req.provider_config_key.capitalize(),
+        nango_connection_id=req.connection_id,
+        provider_config_key=req.provider_config_key,
+        authentication_type="oauth",
+        environment=connector.config.environment if connector else "test",
+        metadata=conn_meta
+    )
+    if connector:
+        connector.status = ConnectionStatus(status)
+        connector._error = None
+
+    return {
+        "status": "success",
+        "connection": saved,
+        "connector_id": req.provider_config_key,
+    }
 
 
 @router.get("/status")
@@ -176,6 +232,22 @@ async def generate_synthetic_for_connector(
                 entity_type="ticket",
                 entity_id=tk["ticket_id"],
                 payload=tk
+            ))
+    elif connector.config.agent_domain == "engineering":
+        for cm in full_dataset.get("engineering", {}).get("commits", []):
+            records.append(connector.make_normalized_record(
+                company_id="default",
+                entity_type="commit",
+                entity_id=cm.get("sha", f"sha_{len(records)}"),
+                payload=cm
+            ))
+    elif connector.config.agent_domain == "product":
+        for pr in full_dataset.get("engineering", {}).get("pull_requests", []):
+            records.append(connector.make_normalized_record(
+                company_id="default",
+                entity_type="product_analytics",
+                entity_id=f"pr_{pr.get('number', len(records))}",
+                payload=pr
             ))
 
     if records:

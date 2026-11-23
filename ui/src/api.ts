@@ -499,3 +499,40 @@ export async function generateSyntheticData(
   return res.json();
 }
 
+export interface NangoSessionResponse {
+  token: string;
+  expires_at?: string | null;
+  is_sandbox?: boolean;
+  message?: string;
+  error?: string;
+}
+
+export async function fetchNangoSessionToken(
+  companyId: string = 'default',
+  allowedIntegrations?: string[]
+): Promise<NangoSessionResponse> {
+  const res = await fetch(`${API_BASE}/integrations/nango/session-token`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ company_id: companyId, allowed_integrations: allowedIntegrations })
+  });
+  if (!res.ok) throw new Error('Failed to generate Nango Connect session token');
+  return res.json();
+}
+
+export async function notifyNangoCallback(payload: {
+  connection_id: string;
+  provider_config_key: string;
+  company_id?: string;
+}): Promise<{ status: string; connection: any; connector_id: string }> {
+  const res = await fetch(`${API_BASE}/integrations/nango/callback`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Failed to save Nango connection');
+  return res.json();
+}
+

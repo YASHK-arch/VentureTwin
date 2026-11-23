@@ -122,28 +122,32 @@ class IntegrationManager:
 # ---------------------------------------------------------------------------
 
 def _build_registry() -> ConnectorRegistry:
-    """Instantiate and register all 12 connectors."""
+    """Instantiate and register all connectors (Nango managed and direct APIs)."""
     from integrations.financial.stripe_connector import StripeConnector
     from integrations.financial.quickbooks_connector import QuickBooksConnector
     from integrations.growth.hubspot_connector import HubSpotConnector
+    from integrations.growth.mixpanel_connector import MixpanelConnector
     from integrations.growth.ga4_connector import GA4Connector
     from integrations.engineering.github_connector import GitHubConnector
+    from integrations.engineering.datadog_connector import DatadogConnector
     from integrations.engineering.cloudwatch_connector import CloudWatchConnector
     from integrations.customer.intercom_connector import IntercomConnector
     from integrations.customer.zendesk_connector import ZendeskConnector
+    from integrations.product.amplitude_connector import AmplitudeConnector
     from integrations.product.posthog_connector import PostHogConnector
     from integrations.product.linear_connector import LinearConnector
     from integrations.intelligence.firecrawl_connector import FirecrawlConnector
+    from integrations.intelligence.brave_search_connector import BraveSearchConnector
     from integrations.intelligence.tavily_connector import TavilyConnector
 
     reg = ConnectorRegistry()
     for cls in [
         StripeConnector, QuickBooksConnector,
-        HubSpotConnector, GA4Connector,
-        GitHubConnector, CloudWatchConnector,
+        HubSpotConnector, MixpanelConnector, GA4Connector,
+        GitHubConnector, DatadogConnector, CloudWatchConnector,
         IntercomConnector, ZendeskConnector,
-        PostHogConnector, LinearConnector,
-        FirecrawlConnector, TavilyConnector,
+        AmplitudeConnector, PostHogConnector, LinearConnector,
+        FirecrawlConnector, BraveSearchConnector, TavilyConnector,
     ]:
         reg.register(cls())
     return reg

@@ -58,9 +58,30 @@ class AbstractConnector(ABC):
         self._last_sync: Optional[str] = None
         self._error: Optional[str] = None
 
-    def load_credentials(self) -> bool:
-        """Load credentials from environment variables. Returns True if all required creds present."""
+    def get_nango_connection(self, company_id: str = "default") -> Optional[Dict[str, Any]]:
+        """Check if an active Nango connection exists in persistent store."""
+        try:
+            from integrations.store import get_connection_state
+            conn = get_connection_state(self.config.connector_id, company_id=company_id)
+            if conn and conn.get("nango_connection_id") and conn.get("connection_status") in ("connected", "sandbox_connected"):
+                return conn
+            return None
+        except Exception:
+            return None
+
+    def load_credentials(self, company_id: str = "default") -> bool:
+        """
+        Load credentials from Nango connection or environment variables.
+        Returns True if authenticated via Nango or all required direct env vars are present.
+        """
         import os
+        # Check active Nango connection first
+        nango_conn = self.get_nango_connection(company_id=company_id)
+        if nango_conn:
+            self.status = ConnectionStatus.CONNECTED if self.config.environment != "sandbox" else ConnectionStatus.SANDBOX_CONNECTED
+            self._error = None
+            return True
+
         self._credentials = {}
         missing = []
         for var in self.config.credential_env_vars:

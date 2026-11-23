@@ -214,7 +214,7 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
             agentColor="text-cyan-400"
             integrations={[
               { connectorId: 'hubspot', displayName: 'HubSpot', description: 'CRM contacts, deals, pipelines & marketing activity' },
-              { connectorId: 'ga4', displayName: 'Google Analytics 4', description: 'Website sessions, conversions, acquisition & engagement' }
+              { connectorId: 'mixpanel', displayName: 'Mixpanel', description: 'User funnels, conversion journeys & retention cohorts' }
             ]}
             connectorStatuses={connectorStatuses}
             companyProfile={(activeContext ?? {}) as Record<string, unknown>}
@@ -228,7 +228,7 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
             agentColor="text-amber-400"
             integrations={[
               { connectorId: 'github', displayName: 'GitHub', description: 'Commits, PRs, issues, releases & engineering velocity' },
-              { connectorId: 'cloudwatch', displayName: 'AWS CloudWatch', description: 'Infrastructure metrics, uptime, latency & resource utilization' }
+              { connectorId: 'datadog', displayName: 'Datadog', description: 'Infrastructure metrics, API latency p95, error rates & SLA availability' }
             ]}
             connectorStatuses={connectorStatuses}
             companyProfile={(activeContext ?? {}) as Record<string, unknown>}
@@ -255,7 +255,7 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
             agentRole="Chief Product Officer"
             agentColor="text-pink-400"
             integrations={[
-              { connectorId: 'posthog', displayName: 'PostHog', description: 'Product analytics, feature adoption & user retention' },
+              { connectorId: 'amplitude', displayName: 'Amplitude', description: 'Feature adoption, daily active users & cohort retention' },
               { connectorId: 'linear', displayName: 'Linear', description: 'Issues, roadmap, cycles & product development velocity' }
             ]}
             connectorStatuses={connectorStatuses}
@@ -270,7 +270,7 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
             agentColor="text-rose-400"
             integrations={[
               { connectorId: 'firecrawl', displayName: 'Firecrawl', description: 'Real-time competitor website scraping & public pricing data' },
-              { connectorId: 'tavily', displayName: 'Tavily', description: 'Market intelligence, competitor developments & industry benchmarks' }
+              { connectorId: 'brave_search', displayName: 'Brave Search', description: 'Evidence-backed market research, benchmarks & developments' }
             ]}
             connectorStatuses={connectorStatuses}
             companyProfile={(activeContext ?? {}) as Record<string, unknown>}
