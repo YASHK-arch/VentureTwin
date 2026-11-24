@@ -556,20 +556,8 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
               </div>
             </div>
 
-            {/* Right: Mic & Action Button */}
+            {/* Right: Action Buttons */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                disabled={!isDataConnected}
-                className={`p-1.5 rounded transition text-xs ${
-                  !isDataConnected
-                    ? 'text-[#555555] opacity-50 cursor-not-allowed'
-                    : 'text-[#777777] hover:text-[#cccccc] hover:bg-[#282828] cursor-pointer'
-                }`}
-                title="Voice Dictation"
-              >
-                🎙️
-              </button>
               <button
                 onClick={() => handleSubmit()}
                 disabled={!isDataConnected || isRunning || isChatting || !decisionQuery.trim()}
@@ -649,31 +637,6 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
             </span>
           </div>
         )}
-
-        {/* Quick Example Presets tailored to active selection */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] text-[#888888] scrollbar-none">
-          {activeOption.presets.map((preset, idx) => (
-            <button
-              key={idx}
-              disabled={!isDataConnected || isRunning || isChatting}
-              onClick={() => {
-                if (!isDataConnected) {
-                  if (onConnectData) onConnectData();
-                  return;
-                }
-                setDecisionQuery(preset);
-                handleSubmit(preset);
-              }}
-              className={`px-2 py-0.5 rounded bg-[#222222] text-[#aaaaaa] border border-[#2e2e2e] transition whitespace-nowrap text-[10px] ${
-                !isDataConnected
-                  ? 'opacity-40 cursor-not-allowed'
-                  : 'hover:bg-[#2a2a2a] hover:text-white cursor-pointer'
-              }`}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* 3. Messages Stream (War Room Activity & 1-on-1 Dialogue) */}
