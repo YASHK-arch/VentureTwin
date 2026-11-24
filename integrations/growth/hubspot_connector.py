@@ -83,6 +83,16 @@ class HubSpotConnector(AbstractConnector):
         targets = entity_types or ["contacts", "companies", "deals"]
         headers = {"Authorization": f"Bearer {self._credentials['HUBSPOT_ACCESS_TOKEN']}"}
         results: List[Dict[str, Any]] = []
+        props_map = {
+            "contacts": "email,firstname,lastname,jobtitle,phone,company,lifecyclestage,createdate",
+            "companies": "name,domain,industry,numberofemployees,annualrevenue,city,state,country,createdate",
+            "deals": "dealname,amount,dealstage,pipeline,closedate,createdate",
+        }
+        type_map = {
+            "contacts": "contact",
+            "companies": "company",
+            "deals": "deal",
+        }
         try:
             import httpx
             async with httpx.AsyncClient() as client:
@@ -90,6 +100,8 @@ class HubSpotConnector(AbstractConnector):
                     after: Optional[str] = None
                     while True:
                         params: Dict[str, Any] = {"limit": 100}
+                        if obj_type in props_map:
+                            params["properties"] = props_map[obj_type]
                         if after:
                             params["after"] = after
                         resp = await client.get(
@@ -102,7 +114,7 @@ class HubSpotConnector(AbstractConnector):
                             break
                         data = resp.json()
                         for item in data.get("results", []):
-                            item["_entity_type"] = obj_type.rstrip("s")
+                            item["_entity_type"] = type_map.get(obj_type, obj_type.rstrip("s"))
                         results.extend(data.get("results", []))
                         paging = data.get("paging", {})
                         next_page = paging.get("next", {}).get("after")
@@ -126,17 +138,22 @@ class HubSpotConnector(AbstractConnector):
                     "email": props.get("email"),
                     "firstname": props.get("firstname"),
                     "lastname": props.get("lastname"),
+                    "jobtitle": props.get("jobtitle"),
+                    "phone": props.get("phone"),
                     "company": props.get("company"),
                     "lifecyclestage": props.get("lifecyclestage"),
                     "createdate": props.get("createdate"),
                 }
-            elif entity_type == "compan":  # "companies" → "compan"
+            elif entity_type in ("company", "companies", "companie", "compan"):
                 payload = {
                     "name": props.get("name"),
                     "domain": props.get("domain"),
                     "industry": props.get("industry"),
                     "numberofemployees": props.get("numberofemployees"),
                     "annualrevenue": props.get("annualrevenue"),
+                    "city": props.get("city"),
+                    "state": props.get("state"),
+                    "country": props.get("country"),
                 }
             elif entity_type == "deal":
                 payload = {

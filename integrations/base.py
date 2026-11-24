@@ -84,6 +84,18 @@ class AbstractConnector(ABC):
 
         self._credentials = {}
         missing = []
+        from pathlib import Path
+        env_file = Path(".env")
+        if env_file.exists():
+            try:
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            except Exception:
+                pass
+
         for var in self.config.credential_env_vars:
             val = os.getenv(var)
             if val:
@@ -118,6 +130,12 @@ class AbstractConnector(ABC):
         try:
             raw = await self.fetch_data(since=since)
             normalized = self.normalize_data(raw)
+            if normalized:
+                try:
+                    from integrations.normalized_store import upsert_records
+                    upsert_records(normalized)
+                except Exception:
+                    pass
             self._last_sync = datetime.now(timezone.utc).isoformat()
             self.status = ConnectionStatus.CONNECTED
             return SyncRecord(
