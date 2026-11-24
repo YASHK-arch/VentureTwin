@@ -50,6 +50,20 @@ class SyncRecord:
     error_message: Optional[str] = None
 
 
+# Load .env once at module import if present
+from pathlib import Path
+env_file = Path(".env")
+if env_file.exists():
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
+
+
 def _is_real_credential(val: Optional[str]) -> bool:
     if not val:
         return False
@@ -96,18 +110,6 @@ class AbstractConnector(ABC):
 
         self._credentials = {}
         missing = []
-        from pathlib import Path
-        env_file = Path(".env")
-        if env_file.exists():
-            try:
-                for line in env_file.read_text(encoding="utf-8").splitlines():
-                    line = line.strip()
-                    if "=" in line and not line.startswith("#"):
-                        k, v = line.split("=", 1)
-                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-            except Exception:
-                pass
-
         for var in self.config.credential_env_vars:
             val = os.getenv(var)
             if _is_real_credential(val):
@@ -180,7 +182,7 @@ class AbstractConnector(ABC):
         try:
             from integrations.store import get_connection_state
             saved = get_connection_state(self.config.connector_id)
-            if saved and saved.get("connection_status") in ("connected", "sandbox_connected"):
+            if saved and saved.get("connection_status") in ("connected", "sandbox_connected") and self.status != ConnectionStatus.AWAITING_CREDENTIALS:
                 self.status = ConnectionStatus(saved["connection_status"])
                 if not self._last_sync and saved.get("last_sync"):
                     self._last_sync = saved.get("last_sync")

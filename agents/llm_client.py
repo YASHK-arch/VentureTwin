@@ -152,7 +152,12 @@ class LLMClient:
 
         # 3. Real or Record mode (with semaphore limiter, pacing, and exponential backoff)
         last_error = None
-        min_pacing = float(os.getenv("LLM_REQUEST_INTERVAL", "4.5")) if self.provider == "gemini" else float(os.getenv("LLM_REQUEST_INTERVAL", "0.2"))
+        if self.provider == "gemini":
+            min_pacing = float(os.getenv("LLM_REQUEST_INTERVAL", "4.5"))
+        elif self.provider == "groq":
+            min_pacing = float(os.getenv("LLM_REQUEST_INTERVAL", "1.5"))
+        else:
+            min_pacing = float(os.getenv("LLM_REQUEST_INTERVAL", "0.2"))
         async with _LLM_SEMAPHORE:
             for attempt in range(max_retries):
                 try:
@@ -219,6 +224,17 @@ class LLMClient:
                             logger.warning(
                                 f"Daily quota exhausted for model {self.model}. "
                                 f"Auto-switching to fallback Flash Lite model {new_model} (500 RPD tier)..."
+                            )
+                            self.model = new_model
+                            continue
+                    elif self.provider == "groq":
+                        from services.groq_limiter import groq_rate_limiter, ACTIVE_GROQ_MODELS
+                        candidates = [m for m in ACTIVE_GROQ_MODELS if m != self.model]
+                        if candidates:
+                            new_model = groq_rate_limiter.get_preferred_available_model(candidates)
+                            logger.warning(
+                                f"Groq TPM limit reached for model {self.model}. "
+                                f"Auto-switching to alternate model bucket {new_model}..."
                             )
                             self.model = new_model
                             continue
@@ -307,9 +323,16 @@ class LLMClient:
                 base_url = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1").rstrip("/")
                 url = f"{base_url}/chat/completions"
             elif self.provider == "groq":
+                from services.groq_limiter import groq_rate_limiter, ACTIVE_GROQ_MODELS, parse_retry_after
                 api_key = os.getenv("GROQ_API_KEY") or os.getenv("LLM_API_KEY")
                 base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
                 url = f"{base_url}/chat/completions"
+                # If current model is cooling down from rate limit, route dynamically to available model
+                if groq_rate_limiter.is_model_rate_limited(self.model):
+                    alt_model = groq_rate_limiter.get_preferred_available_model(ACTIVE_GROQ_MODELS)
+                    if alt_model != self.model:
+                        logger.info("Groq model %s cooling down; dynamically routing request to %s", self.model, alt_model)
+                        self.model = alt_model
             elif self.provider == "openai_compatible":
                 api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
                 base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/")
@@ -334,14 +357,26 @@ class LLMClient:
                 "temperature": temperature,
                 "response_format": {"type": "json_object"}
             }
+            if self.provider == "groq":
+                payload["max_tokens"] = 1500
+                await groq_rate_limiter.pace_request(self.model, estimated_tokens=1500)
+
             async with httpx.AsyncClient(timeout=60.0) as client:
                 res = await client.post(url, json=payload, headers=headers)
-                if res.status_code in [400, 404] and self.provider == "groq":
-                    for fallback_m in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
+                if self.provider == "groq":
+                    groq_rate_limiter.update_from_headers(self.model, res.headers, res.status_code)
+
+                if res.status_code in [400, 404, 429] and self.provider == "groq":
+                    for fallback_m in ACTIVE_GROQ_MODELS:
                         if fallback_m == self.model:
                             continue
+                        if groq_rate_limiter.is_model_rate_limited(fallback_m):
+                            continue
+                        logger.warning("Groq call hit HTTP %s on %s; immediately rotating to model %s...", res.status_code, self.model, fallback_m)
                         payload["model"] = fallback_m
+                        await asyncio.sleep(0.5)
                         res = await client.post(url, json=payload, headers=headers)
+                        groq_rate_limiter.update_from_headers(fallback_m, res.headers, res.status_code)
                         if res.status_code == 200:
                             self.model = fallback_m
                             break
@@ -354,7 +389,10 @@ class LLMClient:
                         err_msg = res.text
 
                     if res.status_code == 429:
-                        retry_after = float(res.headers.get("Retry-After", 2.0))
+                        if self.provider == "groq":
+                            retry_after = parse_retry_after(res.headers, err_msg)
+                        else:
+                            retry_after = float(res.headers.get("Retry-After", 2.0))
                         raise RateLimitError(f"{self.provider} API rate limit exceeded (429): {err_msg}", retry_after=retry_after)
                     raise RuntimeError(f"{self.provider} API error ({res.status_code}): {err_msg}")
 

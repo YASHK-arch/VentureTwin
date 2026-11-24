@@ -1,11 +1,18 @@
 import os
 import re
 import json
+import time
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
+from services.groq_limiter import groq_rate_limiter, ACTIVE_GROQ_MODELS, parse_retry_after
+
 logger = logging.getLogger(__name__)
+
+# Query routing in-memory cache to avoid redundant calls from UI typing, tag clicking, and runs
+_ROUTING_CACHE: Dict[str, Tuple["SupervisorRoutingDecision", float]] = {}
+ROUTING_CACHE_TTL_SECONDS: float = 600.0  # 10 minutes
 
 ALL_SPECIALISTS = ["cfo", "growth", "cto", "customer", "product"]
 
@@ -188,10 +195,21 @@ async def route_decision_specialists(
     mode = os.getenv("LLM_MODE", "mock").lower().strip()
     groq_api_key = os.getenv("GROQ_API_KEY") or os.getenv("LLM_API_KEY")
     
+    # 0. Check in-memory routing cache to eliminate redundant calls from rapid UI interaction
+    norm_key = re.sub(r"\s+", " ", (query or "").strip().lower())
+    now = time.time()
+    if norm_key in _ROUTING_CACHE:
+        cached_decision, cached_time = _ROUTING_CACHE[norm_key]
+        if now - cached_time < ROUTING_CACHE_TTL_SECONDS:
+            logger.info("Supervisor routing: returning cached Groq decision for: '%s'", query)
+            return cached_decision
+
     # If explicitly in mock mode or no Groq key available, run deterministic router
     if mode == "mock" or not groq_api_key:
         logger.info("Supervisor routing: using deterministic router (mode=%s, key_present=%s)", mode, bool(groq_api_key))
-        return deterministic_supervisor_routing(query, company_data)
+        res = deterministic_supervisor_routing(query, company_data)
+        _ROUTING_CACHE[norm_key] = (res, now)
+        return res
 
     # Prepare company telemetry summary
     fin = (company_data or {}).get("financials", {})
@@ -257,16 +275,19 @@ async def route_decision_specialists(
         import httpx
 
         groq_base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
-        configured_model = os.getenv("GROQ_MODEL")
+        configured_model = os.getenv("GROQ_MODEL") or os.getenv("LLM_MODEL")
         candidate_models = [m for m in [
             configured_model,
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b",
-            "llama-3.3-70b-versatile"
+            *ACTIVE_GROQ_MODELS
         ] if m]
         seen = set()
         models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+
+        # Prefer model that is not currently token-depleted
+        preferred_model = groq_rate_limiter.get_preferred_available_model(models_to_try)
+        if preferred_model in models_to_try:
+            models_to_try.remove(preferred_model)
+            models_to_try.insert(0, preferred_model)
         
         headers = {
             "Authorization": f"Bearer {groq_api_key}",
@@ -277,6 +298,9 @@ async def route_decision_specialists(
         used_model = None
         async with httpx.AsyncClient(timeout=15.0) as client:
             for model_name in models_to_try:
+                # Proactively pace call to stay strictly within Groq's 8,000 TPM limit
+                await groq_rate_limiter.pace_request(model_name, estimated_tokens=600)
+
                 payload = {
                     "model": model_name,
                     "messages": [
@@ -284,20 +308,31 @@ async def route_decision_specialists(
                         {"role": "user", "content": user_prompt}
                     ],
                     "temperature": 0.0,
+                    "max_tokens": 600,
                     "response_format": {"type": "json_object"}
                 }
                 res = await client.post(f"{groq_base_url}/chat/completions", json=payload, headers=headers)
+                groq_rate_limiter.update_from_headers(model_name, res.headers, res.status_code)
+
                 if res.status_code == 200:
                     data = res.json()
                     used_model = model_name
                     break
+                elif res.status_code == 429:
+                    retry_wait = parse_retry_after(res.headers, res.text)
+                    logger.warning(
+                        "Groq supervisor model %s rate limit exceeded (429, retry after %.1fs). Switching to alternate model bucket...",
+                        model_name, retry_wait
+                    )
+                    await asyncio.sleep(min(retry_wait, 1.5))
+                    continue
                 elif res.status_code in [400, 404]:
                     continue
                 else:
                     res.raise_for_status()
 
             if not data:
-                raise RuntimeError("No Groq candidate models responded successfully.")
+                raise RuntimeError("All Groq candidate models constrained by rate limits or errors.")
             raw_content = data["choices"][0]["message"]["content"]
             parsed = json.loads(raw_content)
 
@@ -319,16 +354,19 @@ async def route_decision_specialists(
                 if spec not in directives:
                     directives[spec] = f"Analyze {spec.upper()} domain metrics for: {query}"
 
-            return SupervisorRoutingDecision(
+            decision = SupervisorRoutingDecision(
                 context_summary=parsed.get("context_summary", query),
                 selected_specialists=sorted_specs,
                 specialist_directives=directives,
-                reasoning=parsed.get("reasoning", "Selected by Groq Supervisor based on boardroom query context."),
+                reasoning=parsed.get("reasoning", f"Selected by Groq Supervisor ({used_model}) based on boardroom query context."),
                 source="groq"
             )
+            _ROUTING_CACHE[norm_key] = (decision, time.time())
+            return decision
 
     except Exception as e:
         logger.warning("Groq supervisor routing failed (%s), engaging deterministic fallback: %s", type(e).__name__, e)
         fallback = deterministic_supervisor_routing(query, company_data)
         fallback.reasoning += f" (Autonomous fallback engaged: Groq routing offline)"
+        _ROUTING_CACHE[norm_key] = (fallback, time.time())
         return fallback

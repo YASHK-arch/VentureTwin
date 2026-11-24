@@ -17,6 +17,7 @@ if _env_path.exists():
                 os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 from agents.llm_client import LLMClient
+from services.groq_limiter import groq_rate_limiter, ACTIVE_GROQ_MODELS, parse_retry_after
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +128,23 @@ def normalize_dropdown_value(val: Optional[str], valid_options: List[str], defau
         return default
     val_clean = val.strip().lower()
     for opt in valid_options:
-        if opt.lower() == val_clean or opt.lower() in val_clean or val_clean in opt.lower():
+        if opt.lower() == val_clean:
             return opt
+    # Check containment prioritizing earliest index and longer matches
+    matches = []
+    for opt in valid_options:
+        pos = val_clean.find(opt.lower())
+        if pos != -1:
+            matches.append((pos, -len(opt), opt))
+        elif "e-commerce" in opt.lower() and "e-commerce" in val_clean:
+            matches.append((val_clean.find("e-commerce"), -len(opt), opt))
+        elif "subscription" in opt.lower() and "subscription" in val_clean:
+            matches.append((val_clean.find("subscription"), -len(opt), opt))
+        elif "hybrid" in opt.lower() and "hybrid" in val_clean:
+            matches.append((val_clean.find("hybrid"), -len(opt), opt))
+    if matches:
+        matches.sort()
+        return matches[0][2]
     return val.strip() if val.strip() else default
 
 
@@ -144,44 +160,44 @@ def heuristic_markdown_extractor(content: str, filenames: List[str]) -> RawExtra
     # Regex patterns for key-value headers or labels
     patterns = {
         "company_name": [
-            r"^(?:#|\*\*|##)?\s*(?:Company\s*Name|Company|Name|Organization)\s*[:\-]\s*(.+)$",
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Company\s*Name|Company|Name|Organization)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$",
             r"^#\s+([A-Za-z0-9\s\.\-_&]+?)(?:\s+-\s+Company Overview|\s+Overview|\s+Context|\s+Brief)?$"
         ],
         "industry": [
-            r"^(?:#|\*\*|##)?\s*(?:Industry|Sector|Vertical|Domain)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Industry|Sector|Vertical|Domain)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "business_model": [
-            r"^(?:#|\*\*|##)?\s*(?:Business\s*Model|Model|Go-to-market|GTM)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Business\s*Model|Model|Go-to-market|GTM)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "stage": [
-            r"^(?:#|\*\*|##)?\s*(?:Stage|Company\s*Stage|Funding\s*Stage|Round)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Stage|Company\s*Stage|Funding\s*Stage|Round)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "geographic_presence": [
-            r"^(?:#|\*\*|##)?\s*(?:Geographic\s*Presence|Geography|Location|Headquarters|HQ|Markets)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Geographic\s*Presence|Geography|Location|Headquarters|HQ|Markets)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "key_competitors": [
-            r"^(?:#|\*\*|##)?\s*(?:Key\s*Competitors|Competitors|Competition|Alternatives)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Key\s*Competitors|Competitors|Competition|Alternatives)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "description": [
-            r"^(?:#|\*\*|##)?\s*(?:Description|Company\s*Description|About|Overview)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Description|Company\s*Description|About|Overview)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "products_services": [
-            r"^(?:#|\*\*|##)?\s*(?:Products?\s*&\s*Services?|Products?|Services?|Offerings?)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Products?\s*&\s*Services?|Products?|Services?|Offerings?)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "target_customers": [
-            r"^(?:#|\*\*|##)?\s*(?:Target\s*Customers?|Ideal\s*Customer\s*Profile|ICP|Customers?)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Target\s*Customers?|Ideal\s*Customer\s*Profile|ICP|Customers?)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "revenue_model": [
-            r"^(?:#|\*\*|##)?\s*(?:Revenue\s*Model|Pricing\s*Model|Monetization)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Revenue\s*Model|Pricing\s*Model|Monetization)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "strategic_goals": [
-            r"^(?:#|\*\*|##)?\s*(?:Strategic\s*Goals?|Objectives?|Goals?|Priorities)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Strategic\s*Goals?|Objectives?|Goals?|Priorities)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "major_challenges": [
-            r"^(?:#|\*\*|##)?\s*(?:Major\s*Challenges?|Challenges?|Key\s*Risks?|Risks?)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Major\s*Challenges?|Challenges?|Key\s*Risks?|Risks?)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ],
         "website_url": [
-            r"^(?:#|\*\*|##)?\s*(?:Website\s*URL|Website|URL|Domain)\s*[:\-]\s*(.+)$"
+            r"^(?:[\*\-\+]|#{1,4})?\s*(?:\*\*)?\s*(?:Website\s*URL|Website|URL|Domain)\s*(?:\*\*)?\s*[:\-]\s*(?:\*\*)?\s*(.+)$"
         ]
     }
 
@@ -249,23 +265,32 @@ async def extract_company_context_with_groq(
     """
     Extract structured company context using Groq's high-speed LPU inference engine.
     Uses GROQ_API_KEY from environment or .env.
-    Tries candidate models on Groq: openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b, llama-3.3-70b-versatile.
+    Paces calls and automatically rotates across active models to stay within Groq's 8,000 TPM limit.
     """
     api_key = os.getenv("GROQ_API_KEY") or os.getenv("LLM_API_KEY")
     if not api_key:
         return None, ""
 
     groq_base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
-    configured_model = os.getenv("GROQ_MODEL")
+    configured_model = os.getenv("GROQ_MODEL") or os.getenv("LLM_MODEL")
     candidate_models = [m for m in [
         configured_model,
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-        "qwen/qwen3.8-27b",
-        "llama-3.3-70b-versatile"
+        *ACTIVE_GROQ_MODELS
     ] if m]
     seen = set()
     models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+
+    # Pick preferred model not currently token-depleted
+    preferred_model = groq_rate_limiter.get_preferred_available_model(models_to_try)
+    if preferred_model in models_to_try:
+        models_to_try.remove(preferred_model)
+        models_to_try.insert(0, preferred_model)
+
+    # Cap untrusted text to ~3,000 tokens (12,000 chars) to prevent exceeding Groq 8,000 TPM limit
+    safe_input = full_untrusted_input
+    if len(safe_input) > 12000:
+        logger.info("Truncating large company context document from %d chars to 12000 chars for Groq TPM budget", len(safe_input))
+        safe_input = safe_input[:12000] + "\n\n[Document truncated to preserve TPM token ceiling]"
 
     system_prompt = (
         "You are an expert corporate intelligence analyst at VentureTwin.\n"
@@ -293,7 +318,7 @@ async def extract_company_context_with_groq(
 
     user_prompt = (
         "Analyze the following untrusted company document(s) and extract the structured company context.\n\n"
-        f"{full_untrusted_input}\n\n"
+        f"{safe_input}\n\n"
         "Return ONLY JSON matching the requested schema."
     )
 
@@ -305,6 +330,9 @@ async def extract_company_context_with_groq(
     import httpx
 
     for model in models_to_try:
+        # Enforce rate limiter pacing and token availability
+        await groq_rate_limiter.pace_request(model, estimated_tokens=2048)
+
         payload = {
             "model": model,
             "messages": [
@@ -312,12 +340,15 @@ async def extract_company_context_with_groq(
                 {"role": "user", "content": user_prompt}
             ],
             "response_format": {"type": "json_object"},
-            "temperature": 0.0
+            "temperature": 0.0,
+            "max_tokens": 2048
         }
 
         try:
             async with httpx.AsyncClient(timeout=45.0) as client:
                 res = await client.post(f"{groq_base_url}/chat/completions", json=payload, headers=headers)
+                groq_rate_limiter.update_from_headers(model, res.headers, res.status_code)
+
                 if res.status_code == 200:
                     data = res.json()
                     raw_content = data["choices"][0]["message"]["content"]
@@ -329,6 +360,14 @@ async def extract_company_context_with_groq(
                     extracted_model = RawExtractedCompanyContext.model_validate(parsed)
                     logger.info("Successfully extracted company context using Groq model %s", model)
                     return extracted_model, model
+                elif res.status_code == 429:
+                    retry_wait = parse_retry_after(res.headers, res.text)
+                    logger.warning(
+                        "Groq extraction model %s hit 429 rate limit (retry after %.1fs). Rotating to alternate model bucket...",
+                        model, retry_wait
+                    )
+                    await asyncio.sleep(min(retry_wait, 1.5))
+                    continue
                 elif res.status_code in [400, 404]:
                     logger.warning("Groq model %s returned status %s: %s. Trying next candidate...", model, res.status_code, res.text[:100])
                     continue
