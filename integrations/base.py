@@ -160,6 +160,17 @@ class AbstractConnector(ABC):
             )
 
     def get_sync_status(self) -> Dict[str, Any]:
+        if self.status == ConnectionStatus.NOT_CONNECTED:
+            if self.load_credentials():
+                self.status = ConnectionStatus.CONNECTED if self.config.environment != "sandbox" else ConnectionStatus.SANDBOX_CONNECTED
+        if not self._last_sync:
+            try:
+                from integrations.store import get_sync_history
+                hist = get_sync_history(self.config.connector_id, limit=1)
+                if hist:
+                    self._last_sync = hist[0].get("sync_end")
+            except Exception:
+                pass
         return {
             "connector_id": self.config.connector_id,
             "display_name": self.config.display_name,
