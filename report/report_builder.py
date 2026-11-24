@@ -809,6 +809,7 @@ def build_consolidated_report(
             }
             for f in findings_list
         ],
+        "selected_specialists": (decision.metadata or {}).get("selected_specialists") if getattr(decision, "metadata", None) else None,
         "number_registry": reg.to_dict()
     }
 

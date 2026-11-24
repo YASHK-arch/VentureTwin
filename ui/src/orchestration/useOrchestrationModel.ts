@@ -25,6 +25,8 @@ export interface AgentRosterState {
   finding?: FindingItem;
   attempts: number;
   startedAt?: number;
+  directive?: string;
+  isInvolved?: boolean;
 }
 
 export interface WarRoomMessage {
@@ -228,6 +230,17 @@ export function useOrchestrationModel(
     let phase: OrchestrationPhase = 'plan';
     let narration = 'Awaiting strategic intake prompt...';
 
+    // Derive active specialist list from existing tasks or default to all 5
+    const specTaskAgents = Object.values(tasks)
+      .filter((t) => t.id && t.id.startsWith('task_') && t.id.endsWith('_analysis'))
+      .map((t) => t.owner_agent.toLowerCase());
+    let selectedSpecialists: string[] = specTaskAgents.length > 0
+      ? ['cfo', 'growth', 'cto', 'customer', 'product'].filter((s) => specTaskAgents.includes(s))
+      : ['cfo', 'growth', 'cto', 'customer', 'product'];
+    let specialistDirectives: Record<string, string> = {};
+    let routingReasoning = '';
+    let routingContextSummary = '';
+
     // 18-cell simulation grid
     const simMatrix: SimulationCell[] = [];
     STRATEGIES.forEach((strat) => {
@@ -253,9 +266,35 @@ export function useOrchestrationModel(
       const timeStr = new Date(evt.ts).toLocaleTimeString();
 
       switch (evt.type) {
+        case 'routing_decided': {
+          if (Array.isArray(p.selected_specialists) && p.selected_specialists.length > 0) {
+            selectedSpecialists = p.selected_specialists;
+          }
+          if (p.specialist_directives && typeof p.specialist_directives === 'object') {
+            specialistDirectives = p.specialist_directives;
+          }
+          if (p.reasoning) {
+            routingReasoning = p.reasoning;
+          }
+          if (p.context_summary) {
+            routingContextSummary = p.context_summary;
+          }
+          const specListUpper = selectedSpecialists.map((s: string) => s.toUpperCase()).join(', ');
+          narration = `SUPERVISOR: Selected ${selectedSpecialists.length} specialists (${specListUpper}) · ${routingContextSummary || routingReasoning || 'Assembling dynamic DAG'}`;
+          messages.push({
+            id: `msg_routing_${idx}`,
+            type: 'system',
+            agent: 'supervisor',
+            timestamp: timeStr,
+            title: `🎯 Supervisor Dynamic Topology Rebuild (${selectedSpecialists.length} Active Specialists)`,
+            content: `Question Context: "${routingContextSummary || 'Strategic query'}"\nActive Specialists: ${specListUpper}\nRationale: ${routingReasoning}`
+          });
+          break;
+        }
+
         case 'task_created': {
           phase = 'plan';
-          narration = 'Decomposing strategic query into 11-node functional DAG...';
+          narration = `Decomposing strategic query into dynamic ${selectedSpecialists.length + 6}-task functional DAG...`;
           break;
         }
 
@@ -263,7 +302,7 @@ export function useOrchestrationModel(
           const taskId = p.task_id || '';
           if (taskId.includes('analysis')) {
             phase = 'analyze';
-            narration = '5 cross-functional specialists evaluating domain parameters in parallel...';
+            narration = `${selectedSpecialists.length} cross-functional specialists evaluating domain parameters in parallel...`;
             const tsNum = new Date(evt.ts).getTime();
             if (agentStates[agentKey]) {
               agentStates[agentKey].status = 'working';
@@ -536,6 +575,16 @@ export function useOrchestrationModel(
       }
     });
 
+    // 4. Mark involvement and directives on agent states
+    ['cfo', 'growth', 'cto', 'customer', 'product'].forEach((agentId) => {
+      if (agentStates[agentId]) {
+        agentStates[agentId].isInvolved = selectedSpecialists.includes(agentId);
+        if (specialistDirectives[agentId]) {
+          agentStates[agentId].directive = specialistDirectives[agentId];
+        }
+      }
+    });
+
     // Count active agents
     const activeAgentsCount = Object.values(agentStates).filter(
       (a) => a.status === 'working' || a.status === 'retrying'
@@ -553,7 +602,11 @@ export function useOrchestrationModel(
       completedSimCount,
       activePackets,
       completedNodeIds,
-      nodeStatusOverrides
+      nodeStatusOverrides,
+      selectedSpecialists,
+      specialistDirectives,
+      routingReasoning,
+      routingContextSummary
     };
   }, [choreographedEvents, tasks, findings, workflowStatus, now]);
 }

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { WarRoomMessage, SimulationCell } from '../../orchestration/useOrchestrationModel';
-import { FindingItem, chatWithAgent, AgentChatResponse } from '../../api';
+import { FindingItem, chatWithAgent, AgentChatResponse, fetchRoutingDecision, SupervisorRoutingDecision } from '../../api';
 import { StagedFault } from '../FailureInjectorModal';
 import { FindingBubble } from './messages/FindingBubble';
 import { SkepticChallenge } from './messages/SkepticChallenge';
@@ -206,6 +206,23 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
   // Local state for direct 1-on-1 dialogue with individual agents
   const [directChatMessages, setDirectChatMessages] = useState<WarRoomMessage[]>([]);
   const [isChatting, setIsChatting] = useState(false);
+  const [routingPreview, setRoutingPreview] = useState<SupervisorRoutingDecision | null>(null);
+
+  useEffect(() => {
+    if (!decisionQuery || !decisionQuery.trim()) {
+      setRoutingPreview(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const preview = await fetchRoutingDecision(decisionQuery.trim());
+        setRoutingPreview(preview);
+      } catch {
+        // Silently handle preview errors
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [decisionQuery]);
 
   const isRunning = workflowStatus === 'running';
   const isComplete = workflowStatus === 'completed' || workflowStatus === 'degraded';
@@ -565,7 +582,7 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
                   !isDataConnected
                     ? 'Connect company data to chat'
                     : selectedAgent === 'board'
-                    ? 'Ask Whole Board'
+                    ? 'Ask Whole Board directly'
                     : `Ask ${activeOption.shortLabel} directly`
                 }
               >
@@ -581,9 +598,46 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
                   </>
                 )}
               </button>
+
+              {selectedAgent === 'board' && onLaunchDecision && (
+                <button
+                  type="button"
+                  onClick={() => onLaunchDecision(decisionQuery)}
+                  disabled={!isDataConnected || isRunning || !decisionQuery.trim()}
+                  className={`px-3 py-1.5 font-semibold text-xs rounded-lg transition shadow-md flex items-center gap-1.5 text-white ${
+                    !isDataConnected
+                      ? 'bg-[#262626] text-[#666666] cursor-not-allowed border border-[#333333]'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-teal-600/20 cursor-pointer'
+                  }`}
+                  title="Run multi-agent flight simulation DAG on this question"
+                >
+                  <span>Run DAG</span>
+                  <span>➔</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Dynamic Groq Supervisor Routing Context Preview */}
+        {routingPreview && (
+          <div className="flex items-center justify-between text-[10px] font-mono px-2.5 py-1.5 bg-[#1a1625] border border-purple-500/30 text-purple-200 rounded-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-purple-400 font-bold uppercase text-[9px] tracking-wider px-1.5 py-0.2 rounded bg-purple-500/20 border border-purple-500/40 shrink-0">
+                Groq Supervisor
+              </span>
+              <span className="text-white font-semibold truncate">
+                {routingPreview.selected_specialists.map((s) => s.toUpperCase()).join(' · ')}
+              </span>
+              <span className="text-slate-400 text-[9px] hidden sm:inline truncate">
+                ({routingPreview.selected_specialists.length} Specialists Involved)
+              </span>
+            </div>
+            <span className="text-[9px] text-purple-400/80 font-mono shrink-0 ml-2">
+              {routingPreview.source === 'groq' ? 'Groq Llama 3.3' : 'Autonomous Router'}
+            </span>
+          </div>
+        )}
 
         {/* Chaos Armed Alert if any */}
         {stagedFault && (

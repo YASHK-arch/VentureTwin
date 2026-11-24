@@ -11,6 +11,7 @@ interface Props {
   activePackets: ActivePacket[];
   onSelectFinding: (finding: FindingItem) => void;
   isIdleStandby?: boolean;
+  selectedSpecialists?: string[];
 }
 
 interface NodeCoord {
@@ -30,19 +31,56 @@ export const OrchestrationGraph: React.FC<Props> = ({
   completedNodeIds,
   activePackets,
   onSelectFinding,
-  isIdleStandby = false
+  isIdleStandby = false,
+  selectedSpecialists
 }) => {
-  // Static topological coordinates (viewBox 0 0 980 380)
-  const nodes: NodeCoord[] = [
+  const defaultSpecialistIds = ['cfo', 'growth', 'cto', 'customer', 'product'];
+
+  // Determine active specialist list dynamically from props, tasks, or fallback
+  const specialistKeys = React.useMemo(() => {
+    if (selectedSpecialists && selectedSpecialists.length > 0) {
+      const filtered = selectedSpecialists.filter((s) => defaultSpecialistIds.includes(s));
+      if (filtered.length > 0) return filtered;
+    }
+    const taskSpecKeys = Object.values(tasks)
+      .filter((t) => t.id && t.id.startsWith('task_') && t.id.endsWith('_analysis'))
+      .map((t) => t.owner_agent.toLowerCase());
+    if (taskSpecKeys.length > 0) {
+      const derived = defaultSpecialistIds.filter((s) => taskSpecKeys.includes(s));
+      if (derived.length > 0) return derived;
+    }
+    return defaultSpecialistIds;
+  }, [selectedSpecialists, tasks]);
+
+  // Dynamically compute symmetric coordinates for active specialists
+  const specialistNodes: NodeCoord[] = React.useMemo(() => {
+    const count = specialistKeys.length;
+    const heightSpan = count <= 1 ? 0 : Math.min(240, Math.max(120, (count - 1) * 60));
+    const startY = 160 - heightSpan / 2;
+    const step = count > 1 ? heightSpan / (count - 1) : 0;
+
+    return specialistKeys.map((agentKey, idx) => {
+      const meta = getAgentMeta(agentKey);
+      const y = count === 1 ? 160 : Math.round(startY + idx * step);
+      return {
+        id: `task_${agentKey}_analysis`,
+        name: meta.name,
+        agent: agentKey,
+        x: 250,
+        y,
+        radius: 24,
+        kind: 'specialist' as const
+      };
+    });
+  }, [specialistKeys]);
+
+  // Complete dynamically rebuilt topology nodes
+  const nodes: NodeCoord[] = React.useMemo(() => [
     // Hub
     { id: 'hub_supervisor', name: 'Supervisor Hub', agent: 'supervisor', x: 70, y: 160, radius: 28, kind: 'supervisor' },
 
-    // Layer 1: Specialists
-    { id: 'task_cfo_analysis', name: 'CFO', agent: 'cfo', x: 250, y: 40, radius: 24, kind: 'specialist' },
-    { id: 'task_growth_analysis', name: 'Growth', agent: 'growth', x: 250, y: 100, radius: 24, kind: 'specialist' },
-    { id: 'task_cto_analysis', name: 'CTO', agent: 'cto', x: 250, y: 160, radius: 24, kind: 'specialist' },
-    { id: 'task_customer_analysis', name: 'Customer', agent: 'customer', x: 250, y: 220, radius: 24, kind: 'specialist' },
-    { id: 'task_product_analysis', name: 'Product', agent: 'product', x: 250, y: 280, radius: 24, kind: 'specialist' },
+    // Layer 1: Dynamically active specialists
+    ...specialistNodes,
 
     // Layer 2: Audit & Resolution
     { id: 'task_skeptic_audit', name: 'Skeptic Audit', agent: 'skeptic', x: 450, y: 160, radius: 26, kind: 'specialist' },
@@ -54,19 +92,17 @@ export const OrchestrationGraph: React.FC<Props> = ({
     { id: 'task_report_draft', name: 'Report Draft', agent: 'supervisor', x: 740, y: 310, radius: 22, kind: 'synthesis' },
     { id: 'task_workflow_verification', name: 'Verification', agent: 'skeptic', x: 550, y: 310, radius: 24, kind: 'synthesis' },
     { id: 'task_report_finalize', name: 'Report Sealed', agent: 'supervisor', x: 360, y: 310, radius: 26, kind: 'seal' }
-  ];
+  ], [specialistNodes]);
 
-  const specialistIds = [
-    'task_cfo_analysis',
-    'task_growth_analysis',
-    'task_cto_analysis',
-    'task_customer_analysis',
-    'task_product_analysis'
-  ];
+  const activeSpecialistIds = React.useMemo(() => specialistNodes.map((n) => n.id), [specialistNodes]);
 
-  const allSpecialistsDone = specialistIds.every(
+  const allSpecialistsDone = activeSpecialistIds.length > 0 && activeSpecialistIds.every(
     (id) => completedNodeIds.has(id) || tasks[id]?.status === 'done'
   );
+
+  const minY = specialistNodes.length > 0 ? Math.min(...specialistNodes.map((n) => n.y)) : 40;
+  const maxY = specialistNodes.length > 0 ? Math.max(...specialistNodes.map((n) => n.y)) : 280;
+  const totalTasksCount = nodes.filter((n) => n.id !== 'hub_supervisor').length;
 
   const getNodeState = (node: NodeCoord) => {
     if (isIdleStandby) return 'standby';
@@ -101,7 +137,7 @@ export const OrchestrationGraph: React.FC<Props> = ({
             {isIdleStandby ? 'Standby DAG Blueprint' : 'Multi-Agent Orchestration Topology'}
           </span>
           <span className="text-slate-600">|</span>
-          <span className="text-[10px] text-slate-400">11 Distributed Tasks · Dependency Order</span>
+          <span className="text-[10px] text-slate-400">{totalTasksCount} Distributed Tasks · Dependency Order</span>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1">
@@ -178,16 +214,14 @@ export const OrchestrationGraph: React.FC<Props> = ({
 
           {/* 1. Static and Active Edges */}
           <g className="edges-layer" opacity={isIdleStandby ? 0.35 : 0.8}>
-            {/* Hub to 5 Specialists */}
-            {specialistIds.map((targetId) => {
-              const targetNode = nodes.find((n) => n.id === targetId);
-              if (!targetNode) return null;
+            {/* Hub to Active Specialists */}
+            {specialistNodes.map((targetNode) => {
               const isRunning = getNodeState(targetNode) === 'running';
               const isDone = getNodeState(targetNode) === 'done' || getNodeState(targetNode) === 'backup';
 
               return (
                 <path
-                  key={`edge_hub_${targetId}`}
+                  key={`edge_hub_${targetNode.id}`}
                   d={`M 70 160 C 140 160, 160 ${targetNode.y}, ${targetNode.x - targetNode.radius} ${targetNode.y}`}
                   fill="none"
                   stroke={isRunning ? '#14b8a6' : isDone ? '#0f766e' : '#334155'}
@@ -197,15 +231,13 @@ export const OrchestrationGraph: React.FC<Props> = ({
               );
             })}
 
-            {/* 5 Specialists to Converging Barrier */}
-            {specialistIds.map((specId) => {
-              const specNode = nodes.find((n) => n.id === specId);
-              if (!specNode) return null;
+            {/* Active Specialists to Converging Barrier */}
+            {specialistNodes.map((specNode) => {
               const isDone = getNodeState(specNode) === 'done' || getNodeState(specNode) === 'backup';
 
               return (
                 <path
-                  key={`edge_barrier_${specId}`}
+                  key={`edge_barrier_${specNode.id}`}
                   d={`M ${specNode.x + specNode.radius} ${specNode.y} L 370 ${specNode.y} L 370 160`}
                   fill="none"
                   stroke={isDone ? '#10b981' : '#334155'}
@@ -218,9 +250,9 @@ export const OrchestrationGraph: React.FC<Props> = ({
             {/* Converging Barrier line into Skeptic */}
             <line
               x1="370"
-              y1="40"
+              y1={minY}
               x2="370"
-              y2="280"
+              y2={maxY}
               stroke={allSpecialistsDone ? '#10b981' : '#475569'}
               strokeWidth={allSpecialistsDone ? 3 : 1.5}
               strokeDasharray={allSpecialistsDone ? 'none' : '4, 4'}

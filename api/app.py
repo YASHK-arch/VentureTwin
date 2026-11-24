@@ -101,6 +101,11 @@ class DecisionRequest(BaseModel):
     query: str
     constraints: Optional[Dict[str, Any]] = None
     injected_failure: Optional[FailureInjectionRequest] = None
+    selected_specialists: Optional[List[str]] = None
+
+class RoutingRequest(BaseModel):
+    query: str
+    company_id: Optional[str] = None
 
 class ApprovalRequest(BaseModel):
     action: Literal["approve", "reject", "request_changes"]
@@ -343,6 +348,18 @@ async def agent_chat_endpoint(req: AgentChatRequest, request: Request):
     )
     return response
 
+@app.post("/api/orchestration/route")
+async def route_orchestration(req: RoutingRequest):
+    """
+    Extracts strategic context from boardroom question and uses Groq layer
+    (with deterministic resilience fallback) to decide active specialist agents
+    and directives for the orchestration topology.
+    """
+    from services.supervisor_groq import route_decision_specialists
+    company_data = load_company_data()
+    routing = await route_decision_specialists(req.query, company_data=company_data)
+    return routing.model_dump()
+
 @app.post("/api/decisions")
 async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTasks):
     """Submits a strategic decision query and launches the multi-agent workflow."""
@@ -362,8 +379,19 @@ async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTask
             "options": decision.classification.clarification_options if decision.classification else []
         }
     
+    from services.supervisor_groq import route_decision_specialists
+    company_data = load_company_data()
+    routing = await route_decision_specialists(req.query, company_data=company_data)
+    if req.selected_specialists:
+        valid_specs = [s for s in ["cfo", "growth", "cto", "customer", "product"] if s in req.selected_specialists]
+        if valid_specs:
+            routing.selected_specialists = valid_specs
+
+    decision.metadata["selected_specialists"] = routing.selected_specialists
+    decision.metadata["routing"] = routing.model_dump()
+
     from agents.llm_client import LLMClient
-    supervisor = Supervisor(llm_client=LLMClient())
+    supervisor = Supervisor(llm_client=LLMClient(), company_data=company_data)
     active_supervisors[decision.id] = supervisor
 
     if req.injected_failure:
@@ -386,7 +414,9 @@ async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTask
         "type": decision.type,
         "question": decision.question,
         "objective": decision.objective,
-        "status": "started"
+        "status": "started",
+        "selected_specialists": routing.selected_specialists,
+        "routing": routing.model_dump()
     }
 
 @app.get("/api/decisions/{decision_id}")
@@ -402,6 +432,8 @@ async def get_decision_status(decision_id: str):
         else:
             raise HTTPException(status_code=404, detail="Decision not found")
 
+    decision_meta = getattr(state.decision, "metadata", {}) or {}
+
     return {
         "decision_id": decision_id,
         "status": state.status,
@@ -412,7 +444,9 @@ async def get_decision_status(decision_id: str):
         "tasks": {k: v.model_dump() for k, v in state.tasks.items()},
         "findings": [f.model_dump() for f in state.findings],
         "conflicts": [c.model_dump() for c in state.conflicts],
-        "events_count": len(state.events)
+        "events_count": len(state.events),
+        "selected_specialists": decision_meta.get("selected_specialists", ["cfo", "growth", "cto", "customer", "product"]),
+        "routing": decision_meta.get("routing", None)
     }
 
 @app.get("/api/decisions/{decision_id}/stream")

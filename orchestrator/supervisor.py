@@ -90,7 +90,20 @@ class Supervisor:
             state = self.checkpointer.load_latest_checkpoint(decision.id)
 
         if state is None:
-            dag = decompose_decision(decision)
+            metadata = decision.metadata or {}
+            selected_specialists = metadata.get("selected_specialists")
+            routing_decision = metadata.get("routing")
+
+            if not selected_specialists:
+                from services.supervisor_groq import route_decision_specialists
+                routing_obj = await route_decision_specialists(decision.question, company_data=self.company_data)
+                selected_specialists = routing_obj.selected_specialists
+                routing_decision = routing_obj.model_dump()
+                metadata["selected_specialists"] = selected_specialists
+                metadata["routing"] = routing_decision
+                decision.metadata = metadata
+
+            dag = decompose_decision(decision, selected_specialists=selected_specialists)
             state = WorkflowState(
                 decision=decision,
                 tasks=dag.tasks,
@@ -101,6 +114,14 @@ class Supervisor:
                     "task_created",
                     agent="supervisor",
                     payload={"task_id": task.id, "owner": task.owner_agent}
+                )
+
+            if routing_decision:
+                payload = routing_decision if isinstance(routing_decision, dict) else routing_decision.model_dump()
+                await self.event_bus.emit(
+                    "routing_decided",
+                    agent="supervisor",
+                    payload=payload
                 )
         else:
             dag = TaskDAG()
