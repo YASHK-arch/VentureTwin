@@ -624,7 +624,7 @@ export const CompanyContextCard: React.FC<CompanyContextCardProps> = ({
               type="text"
               value={formData.company_name}
               onChange={(e) => handleFieldChange('company_name', e.target.value)}
-              placeholder="e.g. NimbusDesk, CloudPulse Inc."
+              placeholder="e.g. Acme Corp, CloudPulse Inc."
               className="w-full px-3 py-2 bg-[#141414] border border-[#2e2e2e] focus:border-purple-500 rounded-xl text-xs text-white placeholder-[#555555] outline-none"
             />
           </FieldWrapper>

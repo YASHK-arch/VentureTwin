@@ -71,7 +71,7 @@ export const VerificationChecklist: React.FC<VerificationChecklistProps> = ({
               {/* Sub-detail */}
               <div className="text-[11px] text-slate-400 font-mono pl-6 pt-0.5">
                 {isFinancialTieOut
-                  ? 'Verified against NimbusDesk snapshot: MRR, CAC, Runway tie out with 100% precision.'
+                  ? 'Verified against operational baseline snapshot: MRR, CAC, Runway tie out with 100% precision.'
                   : r.detail}
               </div>
             </div>

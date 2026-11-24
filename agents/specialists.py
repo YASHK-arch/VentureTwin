@@ -183,8 +183,8 @@ class BaseAnalysisAgent(BaseAgent):
             "CRITICAL RULES ON QUESTION ENTITY & RECOMMENDATION INTEGRITY:\n"
             "1. ENTITY ACCURACY: Read the Strategic Decision Question literally and pay strict attention to who or what is being changed:\n"
             "   - If the user asks about changing their personal name ('my name', 'change my name to...'), personal lifestyle, or founder individual identity, "
-            "do NOT hallucinate that the company name is changing or that NimbusDesk is being rebranded. Address the founder's personal question directly.\n"
-            "   - Clearly state that changing an individual's personal name has zero operational, financial, technical, or growth correlation with NimbusDesk's business metrics.\n"
+            "do NOT hallucinate that the company name is changing or that the company is being rebranded. Address the founder's personal question directly.\n"
+            "   - Clearly state that changing an individual's personal name has zero operational, financial, technical, or growth correlation with the company's business metrics.\n"
             "2. LEGITIMATE BUSINESS & STRATEGIC DECISIONS:\n"
             "   - Headcount/hiring decisions (including percentage of employees or roles to hire), M&A/exit decisions (such as 'Should I sell my company?'), pricing, packaging, and budget allocation ARE VALID company operational decisions.\n"
             "   - Do NOT claim hiring or M&A decisions are 'non-operational' or lack financial levers. Headcount directly connects to payroll burn and the 10.0-month runway floor ($1.65M cash reserves, $125k/mo baseline net burn). M&A connects to company valuation multiples vs independent growth.\n"
@@ -280,12 +280,15 @@ class BaseAnalysisAgent(BaseAgent):
         except Exception:
             pass
 
+        active_comp_name = (active_ctx.get("company_name") if active_ctx else None) or company_data.get("company_name", "the company")
+        active_sys_prompt = self.system_prompt.replace("NimbusDesk", active_comp_name)
+
         prompt = self.build_prompt(tool_data, question=q_text, active_context=active_ctx)
 
         draft: AgentFindingDraft = await llm_call(
             prompt=prompt,
             response_model=AgentFindingDraft,
-            system_prompt=self.system_prompt,
+            system_prompt=active_sys_prompt,
             client=llm_client,
             metadata={
                 "agent_key": self.agent_key,
@@ -318,7 +321,7 @@ class CFOAgent(BaseAnalysisAgent):
             objective="Protect runway and gross margins; prevent unmonetized cost explosions",
             agent_key="cfo",
             system_prompt=(
-                "You are the CFO of NimbusDesk. Your duty is to protect company runway and margins. "
+                "You are the CFO. Your duty is to protect company runway and margins. "
                 "Maintain entity accuracy: do not confuse a founder's personal name or individual actions with corporate rebranding or company name changes. "
                 "Propose assumption ranges for financial levers; never generate final outcome numbers. "
                 "Every claim must cite a tool data field."
@@ -336,7 +339,7 @@ class GrowthAgent(BaseAnalysisAgent):
             objective="Maximize top-of-funnel acquisition, organic user growth, and conversion volume",
             agent_key="growth",
             system_prompt=(
-                "You are the VP of Growth for NimbusDesk. Scale customer acquisition and build self-serve viral flywheels. "
+                "You are the VP of Growth. Scale customer acquisition and build self-serve viral flywheels. "
                 "Maintain entity accuracy: do not confuse a founder's personal name with company rebranding or changing the company name. "
                 "Propose assumption ranges; never fabricate outcomes."
             ),
@@ -385,7 +388,7 @@ class ProductAgent(BaseAnalysisAgent):
             objective="Optimize feature gating, drive activation-to-paid conversion triggers, ensure upgrade friction is healthy",
             agent_key="product",
             system_prompt=(
-                "You are the VP of Product for NimbusDesk. Design tier boundaries and feature gates that encourage "
+                "You are the VP of Product. Design tier boundaries and feature gates that encourage "
                 "users to upgrade naturally when they hit productivity ceilings. "
                 "If a question is irrelevant to product packaging or company strategy, recommend 'reject'."
             ),

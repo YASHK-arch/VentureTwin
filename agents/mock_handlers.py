@@ -61,6 +61,13 @@ def _generate_finding_draft(
     metadata: Optional[Dict[str, Any]] = None
 ) -> AgentFindingDraft:
     data = load_company_data()
+    active_ctx = None
+    try:
+        from services.company_context_store import get_active_company_context
+        active_ctx = get_active_company_context()
+    except Exception:
+        pass
+    company_name = (active_ctx.get("company_name") if active_ctx else None) or data.get("company_name", "the company")
     fin = data["financials"]
     funnel = data["funnel"]
     infra = data["infrastructure"]
@@ -137,7 +144,7 @@ def _generate_finding_draft(
             if agent_key == "cfo":
                 claim = (
                     f"Changing your personal name has zero correlation with cash reserves (${cash:,.0f}) or our {runway:.1f}-month runway. "
-                    "NimbusDesk requires focus on capital efficiency; personal naming actions are outside corporate operations."
+                    f"{company_name} requires focus on capital efficiency; personal naming actions are outside corporate operations."
                 )
             elif agent_key == "growth":
                 claim = (
@@ -292,9 +299,9 @@ def _generate_finding_draft(
     if is_max_expenditure and not (is_enterprise or is_churn or "free" in q_str):
         if agent_key == "cfo":
             claim = (
-                f"NimbusDesk holds ${cash:,.0f} in cash with a current net burn of ${fin['monthly_burn_net']:,.0f}/mo ({runway:.1f} months runway). "
+                f"{company_name} holds ${cash:,.0f} in cash with a current net burn of ${fin['monthly_burn_net']:,.0f}/mo ({runway:.1f} months runway). "
                 f"To maintain at least {min_runway:.1f} months of runway, maximum allowable net burn is ${cash / min_runway:,.0f}/mo. "
-                f"The maximum additional monthly expenditure NimbusDesk can afford is exactly $40,000/mo (${cash / min_runway:,.0f} - ${fin['monthly_burn_net']:,.0f})."
+                f"The maximum additional monthly expenditure {company_name} can afford is exactly $40,000/mo (${cash / min_runway:,.0f} - ${fin['monthly_burn_net']:,.0f})."
             )
             return AgentFindingDraft(
                 claim=claim,
@@ -322,7 +329,7 @@ def _generate_finding_draft(
             )
         elif agent_key == "growth":
             claim = (
-                "Growth confirms NimbusDesk can allocate up to $40,000/mo in additional growth and marketing investments "
+                f"Growth confirms {company_name} can allocate up to $40,000/mo in additional growth and marketing investments "
                 f"while strictly preserving the {min_runway:.1f}-month runway floor. Recommend allocating across paid acquisition and funnel optimization."
             )
             return AgentFindingDraft(
@@ -636,7 +643,7 @@ def _generate_finding_draft(
     if is_m_and_a and not (is_enterprise or is_churn or "free" in q_str):
         if agent_key == "cfo":
             claim = (
-                f"NimbusDesk holds ${cash:,.0f} in cash reserves ({runway:.1f} months runway) and generates ${mrr:,.0f} MRR. "
+                f"{company_name} holds ${cash:,.0f} in cash reserves ({runway:.1f} months runway) and generates ${mrr:,.0f} MRR. "
                 "Selling today commands a discounted early Series A multiple (~3-4x ARR, $4M-$5M); continuing independent scale "
                 "to $2.5M ARR yields superior equity valuation. CFO advises Hold & Scale (Do Not Sell at current stage)."
             )
@@ -737,7 +744,7 @@ def _generate_finding_draft(
     if is_hiring and not (is_enterprise or is_churn or "free" in q_str or is_m_and_a):
         if agent_key == "cfo":
             claim = (
-                f"With ${cash:,.0f} in cash reserves and {runway:.1f} months runway, NimbusDesk can safely support "
+                f"With ${cash:,.0f} in cash reserves and {runway:.1f} months runway, {company_name} can safely support "
                 f"a calibrated 10%–15% headcount expansion (adding 1–2 strategic roles, ~$14k/mo incremental payroll) "
                 f"while preserving an 11.8-month runway buffer well above the {min_runway:.1f}-month safety floor."
             )
@@ -1255,7 +1262,7 @@ def _generate_finding_draft(
     elif is_enterprise and not (is_churn or "free" in q_str):
         if agent_key == "cfo":
             claim = (
-                f"NimbusDesk currently lacks high-tier ACV. An Enterprise tier ($1,500-$3,500/mo) "
+                f"{company_name} currently lacks high-tier ACV. An Enterprise tier ($1,500-$3,500/mo) "
                 f"with annual upfront billing accelerates cash collection and extends runway beyond 18 months."
             )
             return AgentFindingDraft(
@@ -1409,7 +1416,7 @@ def _generate_finding_draft(
     elif is_churn and not ("free" in q_str):
         if agent_key == "cfo":
             claim = (
-                f"At ${mrr:,.0f} MRR and 2.1% monthly churn, NimbusDesk loses ~$2,317 in recurring revenue monthly. "
+                f"At ${mrr:,.0f} MRR and 2.1% monthly churn, {company_name} loses ~$2,317 in recurring revenue monthly. "
                 f"Reducing churn to 1.4% preserves $48,000 in cumulative cash reserves over 12 months."
             )
             return AgentFindingDraft(

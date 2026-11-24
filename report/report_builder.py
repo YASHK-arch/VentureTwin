@@ -28,8 +28,19 @@ def build_consolidated_report(
     findings: Optional[List[Finding]] = None,
     llm_synthesis: Optional[Dict[str, Any]] = None
 ) -> Report:
+    active_ctx = None
+    try:
+        from services.company_context_store import get_active_company_context
+        active_ctx = get_active_company_context()
+    except Exception:
+        pass
+
     data = company_data or load_company_data()
-    company_display_name = data.get("company_name", "the company") if data else "the company"
+    if active_ctx and active_ctx.get("company_name"):
+        company_display_name = active_ctx["company_name"]
+    else:
+        company_display_name = data.get("company_name", "the company") if data else "the company"
+
     model_cfg = load_model_config()
     ranked = rank_strategies(sim_runs, decision.constraints, company_data=data)
     conf_assessment = compute_confidence(
@@ -103,14 +114,24 @@ def build_consolidated_report(
         "restructure", "revenue model", "merchant solution", "dependence on transaction"
     ]) or (("reduce dependence" in q_lower or "rebalance" in q_lower or "re-balance" in q_lower) and "revenue" in q_lower)
 
-    if is_revenue_restructure_query and not is_rejected_by_agents:
+    is_portfolio_reorg_query = any(k in q_lower for k in [
+        "portfolio", "reorganize", "re-organize", "merchant operating system", "unified merchant",
+        "separate commerce tools", "product architecture", "commerce tools"
+    ]) or getattr(decision, "type", "") == "product_portfolio_architecture"
+
+    if (is_revenue_restructure_query or is_portfolio_reorg_query) and not is_rejected_by_agents:
         # Strategic restructuring is an operational model shift designed to preserve runway and stabilize margins.
         # Ensure the recommended strategic roadmap is marked feasible.
         if ranked:
             ranked[0].is_feasible = True
-            ranked[0].feasibility_reason = (
-                f"Feasible: Strategic restructuring shifts revenue to high-margin SaaS subscriptions and usage caps to preserve operational runway."
-            )
+            if is_portfolio_reorg_query:
+                ranked[0].feasibility_reason = (
+                    f"Feasible: Consolidating tools into a unified merchant operating system reduces architectural fragmentation and customer churn while preserving runway."
+                )
+            else:
+                ranked[0].feasibility_reason = (
+                    f"Feasible: Strategic restructuring shifts revenue to high-margin SaaS subscriptions and usage caps to preserve operational runway."
+                )
             top_strategy = ranked[0]
             top_name = top_strategy.strategy
             top_name_pretty = top_name.replace("_", " ")
@@ -180,7 +201,7 @@ def build_consolidated_report(
             f"An additional expenditure of $35,000 per month increases monthly net burn from $125,000 to $160,000, "
             f"preserving 10.31 months of cash runway ($1,650,000 / $160,000 = 10.31 mo). "
             f"This satisfies the mandatory 10.0-month cash runway constraint. "
-            f"NimbusDesk retains $5,000 per month in expenditure headroom before hitting the $40,000 maximum ceiling. "
+            f"{company_display_name} retains $5,000 per month in expenditure headroom before hitting the $40,000 maximum ceiling. "
             f"The projected 25% acquisition increase must be treated as speculative upside rather than guaranteed revenue; spending should be released in staged 30-day milestones."
         )
     elif subtype == "multiple_expenditures":
@@ -247,7 +268,7 @@ def build_consolidated_report(
             f"representing an incremental loss of -$1,545.18 MRR per month. "
             f"A 15% increase in acquisition adds only 3.75 customers per month (+$631.88 MRR), "
             f"producing a net negative MRR drag of -$913.30 per month. "
-            f"NimbusDesk must prioritize retention investments to fix customer churn before increasing top-of-funnel marketing expenditure."
+            f"{company_display_name} must prioritize retention investments to fix customer churn before increasing top-of-funnel marketing expenditure."
         )
     elif subtype == "burn_monte_carlo":
         rec_title = "Risk Assessment: Net Burn Range ($110,000 - $155,000) Runway & Sensitivity Analysis"
@@ -290,7 +311,7 @@ def build_consolidated_report(
             f"An additional expenditure of $39,000 per month increases burn to $164,000 per month, resulting in 10.06 months of runway ($1,650,000 / $164,000 = 10.06 mo). "
             f"While technically compliant with the 10.0-month requirement, the remaining safety margin is only 0.06 months (1.8 days of cash). "
             f"Any unanticipated churn or collections delay causes immediate covenant breach. "
-            f"NimbusDesk must preserve a cash buffer and cap immediate spending at $20,000 to $25,000 per month."
+            f"{company_display_name} must preserve a cash buffer and cap immediate spending at $20,000 to $25,000 per month."
         )
     elif subtype == "injected_false_runway":
         rec_title = "Reject: Proposal Breaches 10.0-Month Runway Constraint ($50,000/month, 9.43 Months Actual Runway)"
@@ -315,14 +336,14 @@ def build_consolidated_report(
         exec_summary = (
             f"Recommendation: Financial Principle: Zero Net Burn Runway is Infinite (Self-Sustaining) (Confidence: {conf_assessment.level}). "
             f"When monthly net burn reaches zero, operating revenue equals expenses, and traditional runway (Cash / Burn) is mathematically undefined (infinite). "
-            f"With a monthly surplus of $20,000, NimbusDesk is cash-flow positive and cash reserves grow from $1,650,000 to $1,890,000 over 12 months. "
+            f"With a monthly surplus of $20,000, {company_display_name} is cash-flow positive and cash reserves grow from $1,650,000 to $1,890,000 over 12 months. "
             f"The conventional burn runway metric is not meaningful for cash-flow positive operations, though operating surplus does not imply unlimited reserves for large capital acquisitions."
         )
     elif subtype == "max_expenditure" or "maximum additional monthly expenditure" in q_lower:
         rec_title = "Maximum Additional Monthly Expenditure: $40,000/month"
         exec_summary = (
             f"Recommendation: Maximum Additional Monthly Expenditure: $40,000/month (Confidence: {conf_assessment.level}). "
-            f"Deterministic financial calculations verify NimbusDesk ($1,650,000 cash balance, $125,000 monthly net burn) "
+            f"Deterministic financial calculations verify {company_display_name} ($1,650,000 cash balance, $125,000 monthly net burn) "
             f"can afford an additional monthly expenditure of up to $40,000 while maintaining at least 10.0 months of cash runway ($165,000 maximum allowable burn). "
             f"CTO's $25,000/month estimate represents an infrastructure compute allocation rather than the overall corporate expenditure limit."
         )
@@ -363,7 +384,7 @@ def build_consolidated_report(
                 f"An additional expenditure of ${target_spend:,.0f} per month increases monthly net burn from $125,000 to $155,000, "
                 f"preserving 10.65 months of cash runway ($1,650,000 / $155,000 = 10.65 mo). "
                 f"This satisfies the 10.0-month runway requirement with 0.65 months of safety margin. "
-                f"NimbusDesk retains an additional $10,000 per month in expenditure headroom before hitting the $40,000 maximum ceiling."
+                f"{company_display_name} retains an additional $10,000 per month in expenditure headroom before hitting the $40,000 maximum ceiling."
             )
     elif is_rejected_by_agents:
         if any(k in q_lower for k in ["sell", "exit", "acquisition", "buyout", "merger"]):
@@ -396,7 +417,9 @@ def build_consolidated_report(
         has_limits = len(proceed_with_limits_agents) > 0
         prefix = "Proceed with Limits: " if has_limits else "Proceed with "
 
-        if is_revenue_restructure_query:
+        if is_portfolio_reorg_query:
+            rec_title = f"{prefix}Unified Merchant Operating System Portfolio Reorganization"
+        elif is_revenue_restructure_query:
             rec_title = "Proceed with Phased Revenue Restructuring: Shift to Tiered Subscriptions, AI Modules & Value-Added Services"
         elif "calibrated_hiring" in top_name.lower() or subtype == "general_hiring":
             rec_title = "Calibrated Recommendation: 10%–15% Headcount Expansion (1–2 Strategic Roles)"
@@ -417,7 +440,18 @@ def build_consolidated_report(
         else:
             rec_title = f"{prefix}{dynamic_topic}"
 
-        if is_revenue_restructure_query:
+        if is_portfolio_reorg_query:
+            exec_summary = (
+                f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
+                f"Executive council analysis across {len(findings_list)} specialist agents recommends unifying {company_display_name}'s "
+                f"product portfolio into an integrated merchant operating system rather than maintaining fragmented standalone tools. "
+                f"The strategic blueprint consolidates core workflows: "
+                f"(1) Build a single unified merchant back-office command center integrating catalog, checkout, and inventory, "
+                f"(2) Modularize legacy point tools into native app extensions with shared developer APIs, and "
+                f"(3) Package AI Sidekick and omnichannel capabilities into cohesive subscription tiers. "
+                f"This architectural consolidation reduces merchant churn, lowers duplicate support costs, and protects operating runway."
+            )
+        elif is_revenue_restructure_query:
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
                 f"Executive council analysis across {len(findings_list)} specialist agents recommends a multi-phased revenue restructuring "
@@ -551,8 +585,8 @@ def build_consolidated_report(
     funnel = data.get("funnel", {})
     infra = data.get("infrastructure", {})
     current_position = {
-        "company": data.get("company_name", "NimbusDesk"),
-        "stage": data.get("stage", "Series A"),
+        "company": company_display_name,
+        "stage": (active_ctx.get("stage") if active_ctx and active_ctx.get("stage") else data.get("stage", "Series A")),
         "mrr": fin.get("mrr", 0.0),
         "arr": fin.get("arr", 0.0),
         "cash_balance": fin.get("cash_balance", 0.0),
@@ -783,7 +817,7 @@ def build_consolidated_report(
                 pass
 
     # 10. Risks & Execution Plan
-    if is_rejected_by_agents:
+    if is_rejected_by_agents or rec_title == "Do not proceed":
         risks_and_triggers = [
             {
                 "risk": "Operational distraction from unvetted proposals",
@@ -798,7 +832,7 @@ def build_consolidated_report(
         ]
         execution_plan = [
             {
-                "phase": "Phase 1: Rejection & Operational Guardrails (Immediate)",
+                "phase": "Phase 1: Operational Baseline Preservation (Immediate)",
                 "gate": f"Runway >= {min_runway_constraint:.1f} mo",
                 "action": f"Formalize executive rejection of '{decision.question}'. Reaffirm company focus on core business operations."
             },
@@ -806,6 +840,36 @@ def build_consolidated_report(
                 "phase": "Phase 2: Baseline Roadmap Execution (Months 1-12)",
                 "gate": f"Gross margin >= 70% and Runway >= {min_runway_constraint:.1f} mo",
                 "action": "Maintain existing product and pricing model while monitoring customer retention and unit economics."
+            }
+        ]
+    elif is_portfolio_reorg_query and not is_rejected_by_agents:
+        risks_and_triggers = [
+            {
+                "risk": "Merchant disruption during tool consolidation",
+                "trigger": "Support ticket volume spikes > 20% post-migration",
+                "mitigation": "Maintain legacy API compatibility bridges and provide 1-click rollback during 90-day transition."
+            },
+            {
+                "risk": "Runway compression below safety floor",
+                "trigger": f"Runway falls below {min_runway_constraint:.1f} months",
+                "mitigation": "Pace engineering migration milestones and defer non-critical feature unification."
+            }
+        ]
+        execution_plan = [
+            {
+                "phase": "Phase 1: Unified Core Architecture & Merchant Pilot (Months 1-3)",
+                "gate": f"Architecture validation and Runway >= {min_runway_constraint:.1f} mo",
+                "action": "Consolidate checkout, catalog, and store management APIs into unified merchant OS; launch closed beta with top 500 D2C merchants."
+            },
+            {
+                "phase": "Phase 2: Merchant OS Migration & App Store Unification (Months 4-6)",
+                "gate": f"Retention >= 95% and Runway >= {min_runway_constraint:.1f} mo",
+                "action": "Migrate Grow and Advanced tiers to unified back-office dashboard; deprecate standalone point tools into integrated apps."
+            },
+            {
+                "phase": "Phase 3: Omnichannel & Enterprise Scale (Months 7-12)",
+                "gate": f"Gross margin >= 70% and Runway >= {min_runway_constraint:.1f} mo",
+                "action": f"Scale unified merchant operating system across {company_display_name} Plus enterprise merchants and expand international localized portals."
             }
         ]
     elif is_revenue_restructure_query and not is_rejected_by_agents:
@@ -835,10 +899,10 @@ def build_consolidated_report(
             {
                 "phase": "Phase 3: Usage Cap Enforcement & Ecosystem Scale (Months 7-12)",
                 "gate": f"Gross margin >= 70% and Runway >= {min_runway_constraint:.1f} mo",
-                "action": "Activate transaction volume caps on base tiers and scale enterprise Shopify Plus migrations."
+                "action": f"Activate transaction volume caps on base tiers and scale enterprise {company_display_name} Plus migrations."
             }
         ]
-    else:
+    elif flip_point_info.get("has_flip_point"):
         risks_and_triggers = [
             {
                 "risk": "Conversion degradation below threshold",
@@ -861,6 +925,31 @@ def build_consolidated_report(
                 "phase": "Phase 2: Full Distribution Scale (Months 4-12)",
                 "gate": f"Gross margin >= 70% and Runway >= {min_runway_constraint:.1f} mo",
                 "action": "Accelerate in-app upgrade triggers and expand self-serve marketing funnels."
+            }
+        ]
+    else:
+        risks_and_triggers = [
+            {
+                "risk": "Unit economics or margin erosion",
+                "trigger": "Gross margin falls below 70% or customer acquisition costs expand",
+                "mitigation": "Enforce strict departmental budget ceilings and pause discretionary rollout."
+            },
+            {
+                "risk": "Runway compression below safety floor",
+                "trigger": f"Runway falls below {min_runway_constraint:.1f} months",
+                "mitigation": "Immediately pause initiative expenditure and restore baseline operational spend."
+            }
+        ]
+        execution_plan = [
+            {
+                "phase": "Phase 1: Phased Operational Pilot & Validation (Months 1-3)",
+                "gate": f"Runway >= {min_runway_constraint:.1f} mo",
+                "action": f"Deploy initial {dynamic_topic.lower()} with controlled cohort; monitor impact on unit economics and net burn."
+            },
+            {
+                "phase": "Phase 2: Full Strategic Rollout & Scale (Months 4-12)",
+                "gate": f"Gross margin >= 70% and Runway >= {min_runway_constraint:.1f} mo",
+                "action": f"Expand {dynamic_topic.lower()} across target customer segments and integrate into core operations."
             }
         ]
 
@@ -1014,7 +1103,7 @@ def build_consolidated_report(
     }
 
     disclaimers = [
-        "Synthetic Data Notice: All financial metrics and telemetry originate from the NimbusDesk benchmark dataset.",
+        f"Operational Telemetry Notice: All financial metrics and telemetry originate from the {company_display_name} operational dataset.",
         "Deterministic Simulation Disclaimer: Outputs reflect mathematical modeling of specified assumptions, not guaranteed outcomes.",
         "Decision Support Only: Strategic recommendations require explicit human sign-off; VentureTwin does not execute external actions."
     ]

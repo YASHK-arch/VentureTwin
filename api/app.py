@@ -349,22 +349,60 @@ async def agent_chat_endpoint(req: AgentChatRequest, request: Request):
     return response
 
 @app.post("/api/orchestration/route")
-async def route_orchestration(req: RoutingRequest):
+async def route_orchestration(req: RoutingRequest, request: Request):
     """
     Extracts strategic context from boardroom question and uses Groq layer
     (with deterministic resilience fallback) to decide active specialist agents
     and directives for the orchestration topology.
     """
     from services.supervisor_groq import route_decision_specialists
+    user = get_current_user(request) if request else None
+    user_id = user["id"] if user else None
+    active = get_active_company_context(user_id=user_id)
     company_data = load_company_data()
+    if active and active.get("company_name"):
+        company_data["company_name"] = active["company_name"]
+        if active.get("stage"):
+            company_data["stage"] = active["stage"]
+        if active.get("description"):
+            company_data["tagline"] = active["description"]
+        if active.get("business_model"):
+            company_data["business_model"] = active["business_model"]
+        if active.get("industry"):
+            company_data["industry"] = active["industry"]
+        if active.get("revenue_model"):
+            company_data["revenue_model"] = active["revenue_model"]
+        if active.get("target_customers"):
+            company_data["target_customers"] = active["target_customers"]
+        if active.get("strategic_goals"):
+            company_data["strategic_goals"] = active["strategic_goals"]
     routing = await route_decision_specialists(req.query, company_data=company_data)
     return routing.model_dump()
 
 @app.post("/api/decisions")
-async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTasks):
+async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTasks, request: Request):
     """Submits a strategic decision query and launches the multi-agent workflow."""
     from services.supervisor_groq import route_decision_specialists
+    user = get_current_user(request) if request else None
+    user_id = user["id"] if user else None
+    active = get_active_company_context(user_id=user_id)
     company_data = load_company_data()
+    if active and active.get("company_name"):
+        company_data["company_name"] = active["company_name"]
+        if active.get("stage"):
+            company_data["stage"] = active["stage"]
+        if active.get("description"):
+            company_data["tagline"] = active["description"]
+        if active.get("business_model"):
+            company_data["business_model"] = active["business_model"]
+        if active.get("industry"):
+            company_data["industry"] = active["industry"]
+        if active.get("revenue_model"):
+            company_data["revenue_model"] = active["revenue_model"]
+        if active.get("target_customers"):
+            company_data["target_customers"] = active["target_customers"]
+        if active.get("strategic_goals"):
+            company_data["strategic_goals"] = active["strategic_goals"]
 
     # 1. Engage Groq Supervisor semantic routing layer first to understand context and select specialists
     routing = await route_decision_specialists(req.query, company_data=company_data)

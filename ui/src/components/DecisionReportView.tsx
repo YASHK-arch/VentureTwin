@@ -313,7 +313,7 @@ export const DecisionReportView: React.FC<Props> = ({ report, decisionId, onAppr
 
           {/* Current Company Baseline Telemetry */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-1">Current Company Baseline Telemetry ({currentPos.company ?? 'NimbusDesk'})</h3>
+            <h3 className="text-lg font-bold text-white mb-1">Current Company Baseline Telemetry ({currentPos.company || 'Company'})</h3>
             <p className="text-xs text-slate-400 mb-4">Foundational operating numbers grounding multi-agent deliberation</p>
 
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -640,7 +640,7 @@ export const DecisionReportView: React.FC<Props> = ({ report, decisionId, onAppr
                 type="text"
                 value={approvalNotes}
                 onChange={(e) => setApprovalNotes(e.target.value)}
-                placeholder="e.g. Approved for pilot rollout in Q1 with Starter guardrails..."
+                placeholder="e.g. Approved for phased rollout in Q1 with operational guardrails..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
               />
             </div>
