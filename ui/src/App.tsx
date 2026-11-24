@@ -226,12 +226,12 @@ export const App: React.FC = () => {
   };
 
   const handleLaunchDecision = async (queryToUse?: string) => {
-    const q = queryToUse || decisionQuery;
+    // Unfreeze everything: connect baseline company telemetry if not yet connected
+    if (!isDataConnected || !company) {
+      await handleConnectCompanyData();
+    }
+    const q = queryToUse || decisionQuery || 'Should we launch a free plan?';
     try {
-      // If company data is not yet connected, connect it to enable the simulation engine
-      if (!isDataConnected || !company) {
-        await handleConnectCompanyData();
-      }
       setWorkflowStatus('running');
       setTasks({});
       setFindings([]);
@@ -419,8 +419,38 @@ export const App: React.FC = () => {
             </nav>
           </div>
 
-          {/* Right: Boardroom Dock Toggle & Executive User Profile */}
+          {/* Right: Try Simulation Button, Boardroom Dock Toggle & Executive User Profile */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                setActiveTab('console');
+                await handleLaunchDecision('Should we launch a free plan?');
+              }}
+              disabled={workflowStatus === 'running'}
+              className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-md ${
+                workflowStatus === 'running'
+                  ? 'bg-purple-900/40 text-purple-300 border border-purple-700/50 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-900/30'
+              }`}
+              title={
+                workflowStatus === 'running'
+                  ? 'Simulation in progress...'
+                  : 'Unfreeze and test 11-node executive DAG simulation'
+              }
+            >
+              {workflowStatus === 'running' ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+                  <span>Simulating...</span>
+                </>
+              ) : (
+                <>
+                  <span>▶</span>
+                  <span>Try Simulation</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => setIsBoardroomOpen(!isBoardroomOpen)}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-mono transition flex items-center gap-1.5 cursor-pointer ${
