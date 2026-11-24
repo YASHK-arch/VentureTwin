@@ -23,9 +23,11 @@ def test_registry_has_all_twelve_connectors():
 
 def test_connectors_await_credentials_when_env_vars_missing(monkeypatch):
     # Ensure env vars are cleared for testing credential gating
+    monkeypatch.setattr("integrations.store.get_connection_state", lambda *args, **kwargs: None)
     for cid in registry.all_connector_ids():
         conn = registry.get_connector(cid)
         assert conn is not None
+        conn.status = ConnectionStatus.NOT_CONNECTED
         for env_var in conn.config.credential_env_vars:
             monkeypatch.delenv(env_var, raising=False)
         
