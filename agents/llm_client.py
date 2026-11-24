@@ -336,6 +336,16 @@ class LLMClient:
             }
             async with httpx.AsyncClient(timeout=60.0) as client:
                 res = await client.post(url, json=payload, headers=headers)
+                if res.status_code in [400, 404] and self.provider == "groq":
+                    for fallback_m in ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]:
+                        if fallback_m == self.model:
+                            continue
+                        payload["model"] = fallback_m
+                        res = await client.post(url, json=payload, headers=headers)
+                        if res.status_code == 200:
+                            self.model = fallback_m
+                            break
+
                 if res.status_code >= 400:
                     try:
                         err_json = res.json()
@@ -349,7 +359,11 @@ class LLMClient:
                     raise RuntimeError(f"{self.provider} API error ({res.status_code}): {err_msg}")
 
                 data = res.json()
-                return data["choices"][0]["message"]["content"]
+                raw_content = data["choices"][0]["message"]["content"].strip()
+                if raw_content.startswith("```"):
+                    raw_content = re.sub(r"^```(?:json)?\s*", "", raw_content, flags=re.IGNORECASE)
+                    raw_content = re.sub(r"\s*```$", "", raw_content).strip()
+                return raw_content
 
         elif self.provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")

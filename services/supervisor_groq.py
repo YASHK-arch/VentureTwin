@@ -243,26 +243,47 @@ async def route_decision_specialists(
         import httpx
 
         groq_base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
-        model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        configured_model = os.getenv("GROQ_MODEL")
+        candidate_models = [m for m in [
+            configured_model,
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
+            "llama-3.3-70b-versatile"
+        ] if m]
+        seen = set()
+        models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
         
         headers = {
             "Authorization": f"Bearer {groq_api_key}",
             "Content-Type": "application/json"
         }
-        payload = {
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.0,
-            "response_format": {"type": "json_object"}
-        }
 
+        data = None
+        used_model = None
         async with httpx.AsyncClient(timeout=15.0) as client:
-            res = await client.post(f"{groq_base_url}/chat/completions", json=payload, headers=headers)
-            res.raise_for_status()
-            data = res.json()
+            for model_name in models_to_try:
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": 0.0,
+                    "response_format": {"type": "json_object"}
+                }
+                res = await client.post(f"{groq_base_url}/chat/completions", json=payload, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    used_model = model_name
+                    break
+                elif res.status_code in [400, 404]:
+                    continue
+                else:
+                    res.raise_for_status()
+
+            if not data:
+                raise RuntimeError("No Groq candidate models responded successfully.")
             raw_content = data["choices"][0]["message"]["content"]
             parsed = json.loads(raw_content)
 

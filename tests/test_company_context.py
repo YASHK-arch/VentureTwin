@@ -206,3 +206,25 @@ Strategic Goals: Expand into EU market
         # 4. Clean up test context
         del_res = await client.delete(f"/api/company/context/{saved_obj['id']}")
         assert del_res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_groq_extraction_shopify_india():
+    from pathlib import Path
+    shopify_path = Path("data/simulated_data/company_context_shopify_india.md")
+    if not shopify_path.exists():
+        pytest.skip("company_context_shopify_india.md does not exist")
+    content = shopify_path.read_text(encoding="utf-8")
+    result = await extract_company_context_from_markdown([{"filename": "company_context_shopify_india.md", "content": content}])
+    
+    assert "Shopify" in result.fields["company_name"]
+    assert result.fields["stage"] in ["Public", "Growth"]
+    assert result.fields["industry"] in ["E-commerce & Retail", "B2B SaaS"]
+    assert result.fields["business_model"] in ["Hybrid (Subscription + Usage)", "Subscription (SaaS)"]
+    assert len(result.fields["description"]) > 20
+    assert len(result.fields["products_services"]) > 20
+    assert len(result.fields["revenue_model"]) > 20
+    assert len(result.fields["strategic_goals"]) > 20
+    assert len(result.missing_fields) == 0
+    assert "company_name" in result.provenance
+

@@ -219,6 +219,11 @@ export const CompanyContextCard: React.FC<CompanyContextCardProps> = ({
 
       const result: ExtractionResult = await extractCompanyContext(payloadFiles);
 
+      // Populate website URL if extracted and not yet entered
+      if (result.fields.website_url) {
+        setWebsiteUrlInput((prev) => prev || result.fields.website_url);
+      }
+
       // Merge extracted fields into form without silently discarding existing manual inputs if desired
       setFormData((prev) => {
         const updated = { ...prev };
@@ -458,16 +463,18 @@ export const CompanyContextCard: React.FC<CompanyContextCardProps> = ({
                 onClick={handleExtractAndAutoFill}
                 disabled={isExtracting}
                 className="px-3 py-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 cursor-pointer"
+                title="AI Auto-Fill powered by Groq LPU engine"
               >
                 {isExtracting ? (
                   <>
                     <span className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    <span>Extracting...</span>
+                    <span>Extracting with Groq...</span>
                   </>
                 ) : (
                   <>
                     <span>✨</span>
                     <span>Upload & Auto-Fill</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-purple-950/80 text-purple-200 border border-purple-400/40 rounded">Groq</span>
                   </>
                 )}
               </button>
@@ -885,7 +892,7 @@ const FieldWrapper: React.FC<{
             title={`Source: ${provenance.source_detail || provenance.source}`}
           >
             <span>✨</span>
-            <span>Extracted</span>
+            <span>{provenance.source_detail?.includes('Groq') ? 'Groq AI' : 'Extracted'}</span>
           </span>
         )}
         {provenance?.source === 'website_scraper' && (
@@ -950,7 +957,7 @@ const MarkdownFieldWrapper: React.FC<{
               title={`Source: ${provenance.source_detail || provenance.source}`}
             >
               <span>✨</span>
-              <span>Auto-Extracted</span>
+              <span>{provenance.source_detail?.includes('Groq') ? 'Groq AI' : 'Auto-Extracted'}</span>
             </span>
           )}
           {provenance?.source === 'website_scraper' && (
