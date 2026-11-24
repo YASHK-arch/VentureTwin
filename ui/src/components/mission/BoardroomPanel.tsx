@@ -15,11 +15,11 @@ import { DirectAgentChatBubble } from './messages/DirectAgentChatBubble';
 export interface BoardroomPanelProps {
   decisionQuery: string;
   setDecisionQuery: (q: string) => void;
-  onLaunchDecision: (queryToUse?: string) => void;
+  onLaunchDecision?: (queryToUse?: string) => void;
   onReset: () => void;
   workflowStatus: string;
-  playbackSpeed: 'cinematic' | 'instant';
-  onTogglePlaybackSpeed: (speed: 'cinematic' | 'instant') => void;
+  playbackSpeed?: 'cinematic' | 'instant';
+  onTogglePlaybackSpeed?: (speed: 'cinematic' | 'instant') => void;
   onSkipToReport: () => void;
   onOpenReport: () => void;
   onInspectFinding?: (finding: FindingItem) => void;
@@ -51,13 +51,13 @@ export interface BoardroomOption {
 export const BOARDROOM_OPTIONS: BoardroomOption[] = [
   {
     id: 'board',
-    label: 'Whole Board (Full Swarm)',
+    label: 'Whole Board (Consensus)',
     shortLabel: 'Whole Board',
     role: 'Multi-Agent Collective',
     icon: '🌐',
     color: 'text-purple-400',
-    description: 'Runs full 11-node distributed DAG simulation & verified report',
-    placeholder: 'Ask any strategic SaaS question (e.g. Should we raise price by 20%?)',
+    description: 'Executive consensus across all functional specialists',
+    placeholder: 'Ask the Board any strategic SaaS question...',
     presets: [
       'Should we launch a free plan?',
       'Should we raise Starter price by 20%?',
@@ -209,7 +209,7 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
 
   const isRunning = workflowStatus === 'running';
   const isComplete = workflowStatus === 'completed' || workflowStatus === 'degraded';
-  const isInstant = playbackSpeed === 'instant';
+  const isInstant = false;
 
   const activeOption = useMemo(() => {
     return BOARDROOM_OPTIONS.find((o) => o.id === selectedAgent) || BOARDROOM_OPTIONS[0];
@@ -268,8 +268,11 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
     const q = (queryText || decisionQuery).trim();
     if (!q || isChatting) return;
 
-    if (!isDataConnected && onConnectData) {
-      onConnectData();
+    if (!isDataConnected) {
+      if (onConnectData) {
+        onConnectData();
+      }
+      return;
     }
 
     const now = new Date();
@@ -292,18 +295,19 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
     setIsChatting(true);
 
     try {
-      // 2. Call backend agent dialogue API
-      const res: AgentChatResponse = await chatWithAgent(selectedAgent, q);
+      // 2. Call backend agent dialogue API (route 'board' to 'supervisor' as consensus voice)
+      const targetAgentKey = selectedAgent === 'board' ? 'supervisor' : selectedAgent;
+      const res: AgentChatResponse = await chatWithAgent(targetAgentKey, q);
       const agentMsg: WarRoomMessage = {
         id: `chat_agent_${Date.now()}`,
         type: 'chat',
-        agent: res.agent_name,
+        agent: selectedAgent === 'board' ? 'Whole Board' : res.agent_name,
         timestamp: new Date(res.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         chatItem: {
           role: 'agent',
-          agent_key: res.agent_key,
-          agent_name: res.agent_name,
-          avatar: res.avatar,
+          agent_key: selectedAgent === 'board' ? 'board' : res.agent_key,
+          agent_name: selectedAgent === 'board' ? 'Whole Board (Consensus)' : res.agent_name,
+          avatar: selectedAgent === 'board' ? '🌐' : res.avatar,
           text: res.response,
           recommendation: res.recommendation,
           confidence: res.confidence,
@@ -326,24 +330,23 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
     }
   };
 
-  // Submit action dispatcher
+  // Submit action dispatcher - chats inside Boardroom (does NOT trigger DAG simulation)
   const handleSubmit = (queryToRun?: string) => {
+    if (!isDataConnected) {
+      if (onConnectData) onConnectData();
+      return;
+    }
     const q = queryToRun || decisionQuery;
     if (!q.trim()) return;
 
-    if (selectedAgent === 'board') {
-      // Usual whole board workflow: runs full 11-node orchestration DAG
-      onLaunchDecision(q);
-    } else {
-      // 1-on-1 dialogue with the specific selected executive agent
-      handleDirectAgentChat(q);
-    }
+    // Direct chat inside Boardroom for all selections
+    handleDirectAgentChat(q);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isRunning && !isChatting && decisionQuery.trim()) {
+      if (isDataConnected && !isRunning && !isChatting && decisionQuery.trim()) {
         handleSubmit();
       }
     }
@@ -403,18 +406,6 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
             <span className="hidden sm:inline">New</span>
           </button>
 
-          <button
-            onClick={() => onTogglePlaybackSpeed(isInstant ? 'cinematic' : 'instant')}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono border transition cursor-pointer ${
-              isInstant
-                ? 'bg-purple-950/40 text-purple-300 border-purple-700/60 font-semibold'
-                : 'bg-[#202020] text-[#888888] border-[#333333] hover:text-[#cccccc]'
-            }`}
-            title="Toggle playback speed (Cinematic vs Instant)"
-          >
-            {isInstant ? '⚡ Instant' : '🎬 Cinematic'}
-          </button>
-
           {isRunning && (
             <button
               onClick={onSkipToReport}
@@ -445,8 +436,15 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
             value={decisionQuery}
             onChange={(e) => setDecisionQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={activeOption.placeholder}
-            className="w-full bg-transparent text-xs sm:text-sm text-[#e5e5e5] placeholder-[#666666] outline-none resize-none font-sans leading-relaxed"
+            disabled={!isDataConnected || isRunning || isChatting}
+            placeholder={
+              !isDataConnected
+                ? 'Connect company data to unlock Boardroom chat...'
+                : activeOption.placeholder
+            }
+            className={`w-full bg-transparent text-xs sm:text-sm text-[#e5e5e5] placeholder-[#666666] outline-none resize-none font-sans leading-relaxed ${
+              !isDataConnected ? 'cursor-not-allowed opacity-50' : ''
+            }`}
           />
 
           {/* Bottom Bar Inside Input Box */}
@@ -456,8 +454,13 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
+                  disabled={!isDataConnected}
                   onClick={() => setShowModeDropdown(!showModeDropdown)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#242424] hover:bg-[#2c2c2c] border border-[#383838] text-[11px] font-medium text-[#cccccc] transition cursor-pointer"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#242424] border border-[#383838] text-[11px] font-medium text-[#cccccc] transition ${
+                    !isDataConnected
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:bg-[#2c2c2c] cursor-pointer'
+                  }`}
                 >
                   <span className={activeOption.color}>{activeOption.icon}</span>
                   <span className="font-semibold text-white">{activeOption.shortLabel}</span>
@@ -491,7 +494,7 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
                             )}
                           </div>
                           <div className="text-[10px] text-[#888888] leading-tight mt-0.5">
-                            Full 11-node multi-agent DAG simulation &amp; verified report
+                            Executive consensus across all functional specialists
                           </div>
                         </div>
                       </button>
@@ -540,29 +543,40 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                className="p-1.5 text-[#777777] hover:text-[#cccccc] hover:bg-[#282828] rounded transition text-xs cursor-pointer"
+                disabled={!isDataConnected}
+                className={`p-1.5 rounded transition text-xs ${
+                  !isDataConnected
+                    ? 'text-[#555555] opacity-50 cursor-not-allowed'
+                    : 'text-[#777777] hover:text-[#cccccc] hover:bg-[#282828] cursor-pointer'
+                }`}
                 title="Voice Dictation"
               >
                 🎙️
               </button>
               <button
                 onClick={() => handleSubmit()}
-                disabled={isRunning || isChatting || !decisionQuery.trim()}
-                className={`px-3 py-1.5 font-semibold text-xs rounded-lg transition shadow-md flex items-center gap-1.5 cursor-pointer text-white ${
-                  selectedAgent === 'board'
-                    ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/20'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/20'
+                disabled={!isDataConnected || isRunning || isChatting || !decisionQuery.trim()}
+                className={`px-3 py-1.5 font-semibold text-xs rounded-lg transition shadow-md flex items-center gap-1.5 text-white ${
+                  !isDataConnected
+                    ? 'bg-[#262626] text-[#666666] cursor-not-allowed border border-[#333333]'
+                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-600/20 cursor-pointer'
                 }`}
-                title={selectedAgent === 'board' ? 'Run Full Multi-Agent Simulation' : `Ask ${activeOption.shortLabel} directly`}
+                title={
+                  !isDataConnected
+                    ? 'Connect company data to chat'
+                    : selectedAgent === 'board'
+                    ? 'Ask Whole Board'
+                    : `Ask ${activeOption.shortLabel} directly`
+                }
               >
                 {isRunning || isChatting ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                    <span>{isRunning ? 'Running' : 'Thinking...'}</span>
+                    <span>Thinking...</span>
                   </>
                 ) : (
                   <>
-                    <span>{selectedAgent === 'board' ? 'Run' : 'Ask'}</span>
+                    <span>Ask</span>
                     <span>➔</span>
                   </>
                 )}
@@ -587,11 +601,20 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
           {activeOption.presets.map((preset, idx) => (
             <button
               key={idx}
+              disabled={!isDataConnected || isRunning || isChatting}
               onClick={() => {
+                if (!isDataConnected) {
+                  if (onConnectData) onConnectData();
+                  return;
+                }
                 setDecisionQuery(preset);
                 handleSubmit(preset);
               }}
-              className="px-2 py-0.5 rounded bg-[#222222] hover:bg-[#2a2a2a] text-[#aaaaaa] hover:text-white border border-[#2e2e2e] transition whitespace-nowrap text-[10px] cursor-pointer"
+              className={`px-2 py-0.5 rounded bg-[#222222] text-[#aaaaaa] border border-[#2e2e2e] transition whitespace-nowrap text-[10px] ${
+                !isDataConnected
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-[#2a2a2a] hover:text-white cursor-pointer'
+              }`}
             >
               {preset}
             </button>
@@ -609,42 +632,41 @@ export const BoardroomPanel: React.FC<BoardroomPanelProps> = ({
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[#666666] space-y-3">
             {/* Custom Emblem */}
             <div className="w-12 h-12 rounded-xl bg-[#202020] border border-[#2e2e2e] flex items-center justify-center text-xl font-bold shadow-lg">
-              {activeOption.icon}
+              {isDataConnected ? activeOption.icon : '🔒'}
             </div>
             <div className="space-y-1">
               <p className="text-xs font-mono text-[#cccccc] font-medium">
-                {selectedAgent === 'board'
-                  ? isDataConnected
-                    ? 'Awaiting Boardroom Question'
-                    : 'No Company Data Connected'
+                {!isDataConnected
+                  ? 'No Company Data Connected'
+                  : selectedAgent === 'board'
+                  ? 'Whole Board Ready'
                   : `${activeOption.label} Ready for Dialogue`}
               </p>
               <p className="text-[11px] text-[#777777] max-w-xs leading-relaxed">
-                {selectedAgent === 'board'
-                  ? 'Type a strategic thesis above or select a preset. Specialist agents will analyze, debate, and verify outcomes in real-time.'
+                {!isDataConnected
+                  ? 'Connect company data to unlock 1-on-1 executive dialogue and boardroom analysis.'
+                  : selectedAgent === 'board'
+                  ? 'Ask Whole Board a strategic question above. Executive consensus will be formulated based on your company context.'
                   : `Ask ${activeOption.shortLabel} specific questions about ${activeOption.description.toLowerCase()}.`}
               </p>
             </div>
             {!isDataConnected && onConnectData && (
               <button
                 onClick={onConnectData}
-                className="mt-1 px-3 py-1.5 bg-[#222222] hover:bg-[#2a2a2a] text-purple-300 text-xs font-medium rounded-lg border border-[#333333] transition cursor-pointer font-sans"
+                className="mt-1 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition cursor-pointer font-sans flex items-center gap-1.5"
               >
-                + Connect Company Data
+                <span>+</span>
+                <span>Connect Company Data</span>
               </button>
             )}
             <div className="pt-3 flex flex-col gap-1.5 text-[10px] font-mono text-[#555555]">
               <div className="flex items-center justify-between gap-4 px-2 py-1 bg-[#1a1a1a] rounded border border-[#252525]">
-                <span>{selectedAgent === 'board' ? 'Run Simulation' : 'Ask Agent'}</span>
+                <span>Ask Agent / Board</span>
                 <span className="text-[#888888]">Enter</span>
               </div>
               <div className="flex items-center justify-between gap-4 px-2 py-1 bg-[#1a1a1a] rounded border border-[#252525]">
                 <span>Multiline Input</span>
                 <span className="text-[#888888]">Shift + Enter</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 px-2 py-1 bg-[#1a1a1a] rounded border border-[#252525]">
-                <span>Inspect Finding</span>
-                <span className="text-[#888888]">Click card</span>
               </div>
             </div>
           </div>

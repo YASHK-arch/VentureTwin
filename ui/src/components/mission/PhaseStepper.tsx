@@ -5,8 +5,8 @@ interface PhaseStepperProps {
   currentPhase: OrchestrationPhase;
   narration: string;
   activeAgentsCount: number;
-  playbackSpeed: 'cinematic' | 'instant';
-  onTogglePlaybackSpeed: (speed: 'cinematic' | 'instant') => void;
+  playbackSpeed?: 'cinematic' | 'instant';
+  onTogglePlaybackSpeed?: (speed: 'cinematic' | 'instant') => void;
   onSkipToReport: () => void;
   isComplete: boolean;
 }
@@ -98,30 +98,6 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({
             />
             <span className="text-slate-400">Agents:</span>
             <span className="font-bold text-teal-300">{activeAgentsCount}/7 active</span>
-          </div>
-
-          {/* Speed Toggle: Cinematic / Instant */}
-          <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px] font-mono">
-            <button
-              onClick={() => onTogglePlaybackSpeed('cinematic')}
-              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                playbackSpeed === 'cinematic'
-                  ? 'bg-teal-500 text-slate-950 font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Cinematic
-            </button>
-            <button
-              onClick={() => onTogglePlaybackSpeed('instant')}
-              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
-                playbackSpeed === 'instant'
-                  ? 'bg-teal-500 text-slate-950 font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Instant
-            </button>
           </div>
 
           {/* Skip to Report Button */}
