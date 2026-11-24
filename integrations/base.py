@@ -50,6 +50,18 @@ class SyncRecord:
     error_message: Optional[str] = None
 
 
+def _is_real_credential(val: Optional[str]) -> bool:
+    if not val:
+        return False
+    v = val.strip().lower()
+    placeholders = [
+        "your_", "_here", "example", "g-xxxxxxxxxx", "owner/repository-name",
+        "ghp_your_", "admin@yourcompany.com", "tvly-your_", "dgtp_your_",
+        "phc_your_", "your-company", "your_company"
+    ]
+    return not any(p in v for p in placeholders)
+
+
 class AbstractConnector(ABC):
     def __init__(self, config: ConnectorConfig):
         self.config = config
@@ -84,9 +96,21 @@ class AbstractConnector(ABC):
 
         self._credentials = {}
         missing = []
+        from pathlib import Path
+        env_file = Path(".env")
+        if env_file.exists():
+            try:
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            except Exception:
+                pass
+
         for var in self.config.credential_env_vars:
             val = os.getenv(var)
-            if val:
+            if _is_real_credential(val):
                 self._credentials[var] = val
             else:
                 missing.append(var)
@@ -94,6 +118,9 @@ class AbstractConnector(ABC):
             self.status = ConnectionStatus.AWAITING_CREDENTIALS
             self._error = f"Missing env vars: {', '.join(missing)}"
             return False
+
+        self.status = ConnectionStatus.SANDBOX_CONNECTED if self.config.environment in ("sandbox", "test") else ConnectionStatus.CONNECTED
+        self._error = None
         return True
 
     @abstractmethod
@@ -118,6 +145,12 @@ class AbstractConnector(ABC):
         try:
             raw = await self.fetch_data(since=since)
             normalized = self.normalize_data(raw)
+            if normalized:
+                try:
+                    from integrations.normalized_store import upsert_records
+                    upsert_records(normalized)
+                except Exception:
+                    pass
             self._last_sync = datetime.now(timezone.utc).isoformat()
             self.status = ConnectionStatus.CONNECTED
             return SyncRecord(
@@ -142,6 +175,25 @@ class AbstractConnector(ABC):
             )
 
     def get_sync_status(self) -> Dict[str, Any]:
+        if self.status in (ConnectionStatus.NOT_CONNECTED, ConnectionStatus.AWAITING_CREDENTIALS):
+            self.load_credentials()
+        try:
+            from integrations.store import get_connection_state
+            saved = get_connection_state(self.config.connector_id)
+            if saved and saved.get("connection_status") in ("connected", "sandbox_connected"):
+                self.status = ConnectionStatus(saved["connection_status"])
+                if not self._last_sync and saved.get("last_sync"):
+                    self._last_sync = saved.get("last_sync")
+        except Exception:
+            pass
+        if not self._last_sync:
+            try:
+                from integrations.store import get_sync_history
+                hist = get_sync_history(self.config.connector_id, limit=1)
+                if hist:
+                    self._last_sync = hist[0].get("completed_at") or hist[0].get("sync_end")
+            except Exception:
+                pass
         return {
             "connector_id": self.config.connector_id,
             "display_name": self.config.display_name,
@@ -153,7 +205,7 @@ class AbstractConnector(ABC):
             "supports_write": self.config.supports_write,
             "supports_synthetic_generation": self.config.supports_synthetic_generation,
             "awaiting_credentials": self.status == ConnectionStatus.AWAITING_CREDENTIALS,
-            "missing_env_vars": [v for v in self.config.credential_env_vars if not __import__('os').getenv(v)]
+            "missing_env_vars": [v for v in self.config.credential_env_vars if not _is_real_credential(__import__('os').getenv(v))]
         }
 
     def make_normalized_record(

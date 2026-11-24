@@ -92,26 +92,42 @@ class LinearConnector(AbstractConnector):
         results: List[Dict[str, Any]] = []
         query = """
         query {
-          issues(first: 50, orderBy: updatedAt) {
+          issues(first: 100, orderBy: updatedAt) {
             nodes {
               id
+              identifier
               title
               description
               priority
               estimate
               state { name type }
               project { id name }
+              cycle { id number name }
+              labels { nodes { name } }
               createdAt
               updatedAt
             }
           }
-          projects(first: 20) {
+          projects(first: 25) {
             nodes {
               id
               name
+              description
               state
               progress
               targetDate
+              startDate
+              url
+            }
+          }
+          cycles(first: 10) {
+            nodes {
+              id
+              number
+              name
+              startsAt
+              endsAt
+              progress
             }
           }
         }
@@ -126,6 +142,8 @@ class LinearConnector(AbstractConnector):
                     results.append({"entity_type": "issue", "raw": issue})
                 for proj in data.get("projects", {}).get("nodes", []):
                     results.append({"entity_type": "project", "raw": proj})
+                for cycle in data.get("cycles", {}).get("nodes", []):
+                    results.append({"entity_type": "cycle", "raw": cycle})
         except Exception as e:
             self._error = str(e)
         return results
@@ -136,14 +154,43 @@ class LinearConnector(AbstractConnector):
             entity_type = item.get("entity_type", "issue")
             raw_data = item.get("raw", {})
             entity_id = str(raw_data.get("id") or hash(str(raw_data)))
-            payload = {
-                "title": raw_data.get("title") or raw_data.get("name"),
-                "status": raw_data.get("state", {}).get("name") if isinstance(raw_data.get("state"), dict) else raw_data.get("state"),
-                "priority": raw_data.get("priority", 0),
-                "estimate": raw_data.get("estimate"),
-                "project": raw_data.get("project", {}).get("name") if isinstance(raw_data.get("project"), dict) else None,
-                "updated_at": raw_data.get("updatedAt") or raw_data.get("createdAt") or datetime.now(timezone.utc).isoformat(),
-            }
+            if entity_type == "issue":
+                labels = [l.get("name") for l in (raw_data.get("labels") or {}).get("nodes", [])] if isinstance(raw_data.get("labels"), dict) else []
+                proj = raw_data.get("project") or {}
+                cyc = raw_data.get("cycle") or {}
+                cycle_name = cyc.get("name") or (f"Cycle {cyc.get('number')}" if cyc.get("number") else None)
+                payload = {
+                    "identifier": raw_data.get("identifier"),
+                    "title": raw_data.get("title"),
+                    "status": (raw_data.get("state") or {}).get("name") if isinstance(raw_data.get("state"), dict) else raw_data.get("state"),
+                    "priority": raw_data.get("priority", 0),
+                    "estimate": raw_data.get("estimate"),
+                    "project": proj.get("name"),
+                    "cycle": cycle_name,
+                    "labels": labels,
+                    "updated_at": raw_data.get("updatedAt") or raw_data.get("createdAt") or datetime.now(timezone.utc).isoformat(),
+                }
+            elif entity_type == "project":
+                payload = {
+                    "name": raw_data.get("name"),
+                    "description": raw_data.get("description"),
+                    "status": raw_data.get("state"),
+                    "progress": raw_data.get("progress", 0),
+                    "target_date": raw_data.get("targetDate"),
+                    "start_date": raw_data.get("startDate"),
+                    "url": raw_data.get("url"),
+                }
+            elif entity_type == "cycle":
+                payload = {
+                    "name": raw_data.get("name") or f"Cycle {raw_data.get('number')}",
+                    "number": raw_data.get("number"),
+                    "starts_at": raw_data.get("startsAt"),
+                    "ends_at": raw_data.get("endsAt"),
+                    "progress": raw_data.get("progress", 0),
+                }
+            else:
+                payload = raw_data
+
             rec = self.make_normalized_record(
                 company_id="default",
                 entity_type=entity_type,
