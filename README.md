@@ -1,6 +1,6 @@
 <span id="venturetwin"></span>
 <p align="center">
-  <img src="docs/assets/readme/live-boardroom-console.jpg" alt="VentureTwin — Live Multi-Agent Boardroom Console & Operational Flight Simulator" width="100%">
+  <img src="docs/assets/readme/venturetwin-logo.png" alt="VentureTwin — Autonomous Executive Digital Twin & Flight Simulator" width="380">
 </p>
 
 <p align="center">
@@ -43,6 +43,10 @@ VentureTwin unites two operational decision intelligence paradigms:
 > [!IMPORTANT]
 > **The Core Architectural Thesis:**
 > *"Agents propose bounded assumptions. Deterministic Python calculates outcomes. Algorithmic verification checks the decisions."*
+
+<p align="center">
+  <img src="docs/assets/readme/live-boardroom-console.jpg" alt="VentureTwin Live Boardroom Console" width="100%">
+</p>
 
 ```
 [ User Strategic Question ] ➔ [ Groq LPU Dynamic Specialist Router ]
