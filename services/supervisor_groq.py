@@ -233,7 +233,21 @@ async def route_decision_specialists(
         "}"
     )
 
+    active_ctx = None
+    try:
+        from services.company_context_store import get_active_company_context
+        active_ctx = get_active_company_context()
+    except Exception:
+        pass
+
+    comp_name = (active_ctx or {}).get("company_name") or (company_data or {}).get("company_name", "the company")
+    comp_desc = (active_ctx or {}).get("description") or (company_data or {}).get("tagline", "")
+    comp_industry = (active_ctx or {}).get("industry") or "B2B SaaS"
+    comp_model = (active_ctx or {}).get("business_model") or "Subscription"
+
     user_prompt = (
+        f"Company: {comp_name} ({comp_industry}, {comp_model})\n"
+        f"Strategic Overview: {comp_desc}\n\n"
         f"Boardroom Question: \"{query}\"\n\n"
         f"Company Telemetry:\n{telemetry_brief}\n\n"
         "Decide which specialist agents to activate in the orchestration topology and generate directives."

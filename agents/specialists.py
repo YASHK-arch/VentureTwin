@@ -150,16 +150,34 @@ class BaseAnalysisAgent(BaseAgent):
         self.tool_names = tool_names or list(self.tools.keys())
         self.prompt_guidance = prompt_guidance
 
-    def build_prompt(self, tool_data: Dict[str, Any], question: Optional[str] = None) -> str:
+    def build_prompt(
+        self,
+        tool_data: Dict[str, Any],
+        question: Optional[str] = None,
+        active_context: Optional[Dict[str, Any]] = None
+    ) -> str:
         sim_table = format_sim_params_table()
         valid_bases = get_valid_basis_list()
         schema_json = get_inlined_draft_schema()
         decision_q = question or "Evaluate decision to launch a free tier."
 
+        ctx_section = ""
+        if active_context and active_context.get("company_name"):
+            ctx_section = (
+                "GROUND-TRUTH COMPANY CONTEXT (Shared Enterprise Resource):\n"
+                f"- Company Name: {active_context.get('company_name')} ({active_context.get('stage')} stage | {active_context.get('industry')})\n"
+                f"- Business Model: {active_context.get('business_model')}\n"
+                f"- Strategic Positioning: {active_context.get('description')}\n"
+                f"- Core Strategic Goals: {active_context.get('strategic_goals')}\n"
+                f"- Key Operational Challenges: {active_context.get('major_challenges')}\n"
+                f"- Key Competitors: {active_context.get('key_competitors')}\n\n"
+            )
+
         return (
             f"Agent Key: {self.agent_key}\n"
             f"Role: {self.role}\n"
             f"Objective: {self.objective}\n\n"
+            f"{ctx_section}"
             f"Strategic Decision Question: {decision_q}\n"
             f"Tool Data:\n{json.dumps(tool_data, indent=2)}\n\n"
             "CRITICAL RULES ON QUESTION ENTITY & RECOMMENDATION INTEGRITY:\n"
@@ -254,7 +272,15 @@ class BaseAnalysisAgent(BaseAgent):
         decision = context.get("decision") if context else None
         q_text = getattr(decision, "question", None) if decision else None
         dec_type = getattr(decision, "type", "free_plan") if decision else "free_plan"
-        prompt = self.build_prompt(tool_data, question=q_text)
+
+        active_ctx = None
+        try:
+            from services.company_context_store import get_active_company_context
+            active_ctx = get_active_company_context()
+        except Exception:
+            pass
+
+        prompt = self.build_prompt(tool_data, question=q_text, active_context=active_ctx)
 
         draft: AgentFindingDraft = await llm_call(
             prompt=prompt,

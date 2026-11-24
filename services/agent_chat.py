@@ -289,17 +289,30 @@ async def chat_with_agent(
         generated = generate_mock_agent_response(agent_key_clean, message, company_data, custom_context)
     else:
         # In real/record LLM mode
+        comp_name = (custom_context or {}).get("company_name") or company_data.get("company_name", "the company")
+        stage = (custom_context or {}).get("stage") or company_data.get("stage", "Growth")
+        industry = (custom_context or {}).get("industry") or "B2B SaaS"
+        model = (custom_context or {}).get("business_model") or "Subscription"
+        desc = (custom_context or {}).get("description") or ""
+        goals = (custom_context or {}).get("strategic_goals") or ""
+        challenges = (custom_context or {}).get("major_challenges") or ""
+
         system_prompt = (
-            f"You are the {meta['name']} ({meta['role']}) of a growing SaaS company.\n"
+            f"You are the {meta['name']} ({meta['role']}) of {comp_name} ({stage} stage, {industry}).\n"
             f"Your specific domain responsibility: {meta['domain']}.\n\n"
+            f"Ground-Truth Company Context:\n"
+            f"- Business Model: {model}\n"
+            f"- Strategic Positioning: {desc}\n"
+            f"- Core Strategic Goals: {goals}\n"
+            f"- Key Operational Challenges: {challenges}\n\n"
             f"Company Financials: Cash ${company_data.get('financials', {}).get('cash_balance'):,}, "
             f"Runway {company_data.get('financials', {}).get('runway_months')} months, "
             f"MRR ${company_data.get('financials', {}).get('mrr'):,}, "
             f"Burn ${company_data.get('financials', {}).get('monthly_burn_net'):,}.\n"
             f"Customers: {company_data.get('customers', {}).get('total_paying')} paying, "
             f"Monthly Churn {company_data.get('customers', {}).get('monthly_churn_rate')*100:.2f}%.\n\n"
-            "Respond directly, concisely, and authoritatively to the CEO's inquiry in character as this executive officer. "
-            "Reference specific operational numbers and provide clear, actionable guidance."
+            f"Respond directly, concisely, and authoritatively to the CEO's inquiry in character as this executive officer of {comp_name}. "
+            "Ground your analysis in the company's business model, customer segments, and verified operational telemetry."
         )
 
         class LLMChatResponse(BaseModel):
