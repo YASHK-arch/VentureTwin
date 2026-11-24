@@ -33,7 +33,7 @@ from conflict.detector import detect_all_conflicts, generate_deterministic_confl
 from conflict.resolver import resolve_conflict_via_simulation
 from simulation.params import SIM_PARAMS
 from verification.verifier import run_all_verification_checks
-from report.report_builder import build_consolidated_report
+from report.report_builder import build_consolidated_report, render_markdown_report
 from data.loader import load_company_data
 
 logger = logging.getLogger(__name__)
@@ -757,6 +757,9 @@ class Supervisor:
             final_report.sections["verification_status"] = "degraded"
         else:
             final_report.sections["verification_status"] = "verified"
+
+        # Render finalized markdown report
+        final_report.sections["markdown_report"] = render_markdown_report(final_report)
 
         # Compute verification hash
         sections_str = json.dumps(final_report.sections, sort_keys=True, default=str)

@@ -15,7 +15,7 @@ if _env_path.exists():
                 _k, _v = _line.split("=", 1)
                 os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Response, Depends, Cookie, Header
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -585,6 +585,25 @@ async def get_decision_report(decision_id: str):
         raise HTTPException(status_code=400, detail="Report generation not yet completed")
 
     return state.report.model_dump()
+
+@app.get("/api/decisions/{decision_id}/report.md")
+async def get_decision_report_markdown(decision_id: str):
+    """Returns the single cohesive markdown document for the decision report."""
+    state = active_workflows.get(decision_id)
+    if not state:
+        supervisor = active_supervisors.get(decision_id)
+        if supervisor and getattr(supervisor, "current_state", None):
+            state = supervisor.current_state
+    if not state:
+        raise HTTPException(status_code=404, detail="Decision not found or still processing")
+    if not state.report:
+        raise HTTPException(status_code=400, detail="Report generation not yet completed")
+
+    md_content = state.report.sections.get("markdown_report")
+    if not md_content:
+        from report.report_builder import render_markdown_report
+        md_content = render_markdown_report(state.report)
+    return PlainTextResponse(md_content, media_type="text/markdown")
 
 @app.get("/api/reports/latest")
 async def get_latest_report():
