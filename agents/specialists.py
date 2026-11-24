@@ -480,24 +480,41 @@ class SkepticAgent(BaseAgent):
                 self.is_degraded = True
 
         if not llm_succeeded:
-            # Deterministic mock check across all simulated parameters with benchmarks
+            # Deterministic benchmark audit across all specialist assumptions
+            benchmark_param_map = {
+                "free_to_paid_conversion": ("b2b_saas_freemium_conversion", "rate"),
+                "infra_cost_per_free_user": ("saas_infra_per_free_user", "cost"),
+                "paid_to_free_cannibalization": ("saas_freemium_cannibalization", "rate"),
+                "free_user_ticket_rate": ("free_support_ticket_rate", "rate"),
+            }
             for f in findings:
                 for asm in f.assumptions:
-                    # Check benchmark limits
-                    if asm.name == "free_to_paid_conversion":
-                        freemium_spec = benchmarks.get("b2b_saas_freemium_conversion", {})
-                        grounded_threshold = round(
-                            (freemium_spec.get("value_low", 0.01) + freemium_spec.get("value_high", 0.035)) / 2.0, 4
-                        )
-                        if asm.base > grounded_threshold:
+                    if asm.name in benchmark_param_map:
+                        bm_id, unit_type = benchmark_param_map[asm.name]
+                        bm_spec = benchmarks.get(bm_id, {})
+                        val_low = bm_spec.get("value_low", 0.01)
+                        val_high = bm_spec.get("value_high", 0.035)
+                        grounded_threshold = round((val_low + val_high) / 2.0, 4)
+
+                        is_flagged = False
+                        if asm.name == "free_to_paid_conversion" and asm.base > grounded_threshold:
+                            is_flagged = True
+                        elif asm.name == "infra_cost_per_free_user" and asm.base > grounded_threshold:
+                            is_flagged = True
+                        elif asm.name == "paid_to_free_cannibalization" and asm.base > grounded_threshold:
+                            is_flagged = True
+                        elif asm.name == "free_user_ticket_rate" and asm.base > grounded_threshold:
+                            is_flagged = True
+
+                        if is_flagged:
                             ch = {
                                 "agent": f.agent,
                                 "assumption": asm.name,
                                 "base": asm.base,
                                 "grounded_threshold": grounded_threshold,
                                 "challenge": (
-                                    f"Proposed conversion ({asm.base*100:.1f}%) exceeds grounded freemium benchmark midpoint "
-                                    f"({grounded_threshold*100:.2f}% from b2b_saas_freemium_conversion) without self-serve historical telemetry."
+                                    f"Proposed {asm.name} ({asm.base}) departs from grounded benchmark midpoint "
+                                    f"({grounded_threshold} from {bm_id}) without verified operational telemetry."
                                 ),
                                 "confidence_penalty": 0.15
                             }
@@ -506,7 +523,7 @@ class SkepticAgent(BaseAgent):
                                 context["state"].skeptic_challenges.append(ch)
 
             claim = (
-                f"Challenged {len(challenges)} assumption(s). Free conversion estimate exceeds grounded benchmark midpoint."
+                f"Challenged {len(challenges)} assumption(s) against grounded industry benchmark midpoints."
             ) if challenges else "All reviewed assumptions meet baseline provenance standards."
 
         return Finding(

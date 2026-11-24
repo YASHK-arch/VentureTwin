@@ -3,7 +3,7 @@ import json
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, Set, List
+from typing import Dict, Any, Optional, Set, List, Tuple
 from state.schemas import (
     Decision,
     Task,
@@ -13,7 +13,9 @@ from state.schemas import (
     SimulationRun,
     VerificationResult,
     Report,
-    Event
+    Event,
+    Message,
+    Rebuttal
 )
 from state.shared_state import WorkflowState
 from state.event_bus import EventBus
@@ -399,27 +401,45 @@ class Supervisor:
 
     async def _run_discussion_task(self, task: Task, state: WorkflowState) -> Any:
         rebuttals_logged = []
-        consolidated_map: Dict[str, Any] = {}
+        consolidated_map: Dict[Any, Any] = {}
+
+        # 1. Deduplicate skeptic challenges by (agent, parameter) to avoid repeating identical disputes
+        unique_challenges: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for c in state.skeptic_challenges:
+            target_agent = (c.get("agent") or c.get("target_agent") or "").strip()
+            param = (c.get("assumption") or c.get("parameter") or c.get("target_parameter") or "").strip()
+            if not target_agent and not param:
+                continue
+            key = (target_agent.lower(), param.lower())
+            if key not in unique_challenges or c.get("severity") == "high":
+                unique_challenges[key] = c
+
+        challenges_to_process = list(unique_challenges.values())
+        if not challenges_to_process and state.skeptic_challenges:
+            challenges_to_process = state.skeptic_challenges[:6]
 
         # Consolidate multi-agent rebuttals into 1 structured call in real/record mode to prevent RPM rate limit spikes
-        if self.llm_client and self.llm_client.mode in ["real", "record"] and len(state.skeptic_challenges) > 1:
+        if self.llm_client and self.llm_client.mode in ["real", "record"] and len(challenges_to_process) > 0:
             from state.schemas import DiscussionRebuttalsDraft
             critiques_summary = [
                 {
-                    "agent": c.get("agent", ""),
-                    "parameter": c.get("assumption", ""),
-                    "critique": c.get("challenge", "")
+                    "agent": c.get("agent") or c.get("target_agent", ""),
+                    "parameter": c.get("assumption") or c.get("parameter", ""),
+                    "critique": c.get("challenge") or c.get("concern", "")
                 }
-                for c in state.skeptic_challenges
+                for c in challenges_to_process
             ]
             prompt = (
-                "You are facilitating the executive cross-agent discussion. "
-                "The Skeptic has audited peer assumptions and raised these critiques:\n"
+                "You are facilitating the executive cross-agent discussion in the Boardroom.\n"
+                "The Skeptic (Independent Risk Auditor) audited peer assumptions and raised these specific critiques:\n"
                 f"{json.dumps(critiques_summary, indent=2)}\n\n"
-                "For EACH challenged agent above, formulate a structured rebuttal: "
-                "choose 'concede', 'defend', or 'compromise'. "
-                "Provide updated parameter bounds (updated_low, updated_base, updated_high) if conceding or compromising. "
-                "Return a JSON object containing a list of 'rebuttals'."
+                "For EACH distinct item above, formulate a distinct, professional structured rebuttal from that specific agent on that parameter:\n"
+                "- agent: Name of the challenged agent (e.g. CFO, Growth, CS, Product, CTO)\n"
+                "- parameter: The exact parameter that was challenged\n"
+                "- stance: choose 'concede', 'defend', or 'compromise'\n"
+                "- updated_low, updated_base, updated_high: numeric bounds if conceding or compromising, null if defending\n"
+                "- rationale: 1-2 sentence evidence-based defense or recalibration\n"
+                "Return a JSON object containing the list of 'rebuttals'."
             )
             try:
                 draft: DiscussionRebuttalsDraft = await llm_call(
@@ -430,17 +450,30 @@ class Supervisor:
                     metadata={"agent_key": "discussion", "task_kind": "discussion"}
                 )
                 for reb in draft.rebuttals:
-                    consolidated_map[reb.agent.lower()] = reb
+                    reb_agent = (reb.agent or "").lower().strip()
+                    reb_param = (reb.parameter or "").lower().strip()
+                    if reb_agent and reb_param:
+                        consolidated_map[(reb_agent, reb_param)] = reb
+                    if reb_agent and reb_agent not in consolidated_map:
+                        consolidated_map[reb_agent] = reb
             except Exception as e:
                 logger.warning(f"Consolidated rebuttal call failed ({e}). Falling back to individual/telemetry handling.")
 
-        for chal in state.skeptic_challenges:
-            target_agent = chal.get("agent", "")
-            param = chal.get("assumption", "")
-            concern = chal.get("challenge", "")
+        for chal in challenges_to_process:
+            target_agent = chal.get("agent") or chal.get("target_agent", "")
+            param = chal.get("assumption") or chal.get("parameter", "")
+            concern = chal.get("challenge") or chal.get("concern", "")
 
-            if target_agent.lower() in consolidated_map:
-                rebuttal = consolidated_map[target_agent.lower()]
+            agent_key = target_agent.lower().strip()
+            param_key = param.lower().strip()
+            rebuttal = consolidated_map.get((agent_key, param_key)) or consolidated_map.get(agent_key)
+
+            if rebuttal:
+                rebuttal = rebuttal.model_copy()
+                if not rebuttal.agent:
+                    rebuttal.agent = target_agent
+                if not rebuttal.parameter:
+                    rebuttal.parameter = param
             else:
                 prompt = (
                     f"Agent: {target_agent}\n"
@@ -449,16 +482,15 @@ class Supervisor:
                     "Respond with a structured rebuttal: choose 'concede', 'defend', or 'compromise'. "
                     "Provide updated parameter bounds if conceding or compromising."
                 )
-
                 from agents.llm_client import llm_call
-                from state.schemas import Rebuttal, Message
+                from state.schemas import Rebuttal
                 try:
                     rebuttal = await llm_call(
                         prompt=prompt,
                         response_model=Rebuttal,
                         system_prompt=f"You are {target_agent}. Provide a bounded professional defense or concession to the Skeptic.",
                         client=self.llm_client,
-                        metadata={"agent_key": target_agent.lower(), "parameter": param, "task_kind": "discussion"}
+                        metadata={"agent_key": agent_key, "parameter": param, "task_kind": "discussion"}
                     )
                 except Exception as reb_err:
                     logger.warning(f"Rebuttal call failed for {target_agent}: {reb_err}. Maintaining telemetry defense.")
@@ -466,12 +498,12 @@ class Supervisor:
                         agent=target_agent,
                         parameter=param,
                         stance="defend",
-                        rationale="Maintained baseline estimate grounded in verified telemetry."
+                        rationale=f"Maintained {param} baseline estimate grounded in verified telemetry."
                     )
 
             state.rebuttals.append(rebuttal)
             msg = Message(
-                from_agent=target_agent,
+                from_agent=target_agent or "Executive Specialist",
                 to_agent="Skeptic",
                 round=1,
                 content=f"[{rebuttal.stance.upper()}] {rebuttal.rationale}"
@@ -479,7 +511,7 @@ class Supervisor:
             state.discussion_messages.append(msg)
             await self.event_bus.emit(
                 "finding_posted",
-                agent=target_agent,
+                agent=target_agent.lower() if target_agent else "growth",
                 payload={"type": "rebuttal", "rebuttal": rebuttal.model_dump()}
             )
 

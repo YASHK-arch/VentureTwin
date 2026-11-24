@@ -32,10 +32,22 @@ export const RebuttalBubble: React.FC<RebuttalBubbleProps> = ({ rebuttal, timest
     stanceIcon = '⚖️';
   }
 
+  const isValidNumber = (val?: number | null): val is number => {
+    return typeof val === 'number' && !isNaN(val) && val !== null;
+  };
+
   const hasUpdatedBounds =
-    rebuttal.updated_base !== undefined ||
-    rebuttal.updated_low !== undefined ||
-    rebuttal.updated_high !== undefined;
+    isValidNumber(rebuttal.updated_base) ||
+    isValidNumber(rebuttal.updated_low) ||
+    isValidNumber(rebuttal.updated_high);
+
+  const formatBound = (val?: number | null) => {
+    if (!isValidNumber(val)) return '—';
+    if (Math.abs(val) > 0 && Math.abs(val) < 1) {
+      return `${(val * 100).toFixed(1)}%`;
+    }
+    return Number.isInteger(val) ? val.toString() : val.toFixed(2);
+  };
 
   return (
     <div className="ml-5 border-l-2 border-teal-500/40 pl-3 py-1 space-y-1.5">
@@ -74,12 +86,12 @@ export const RebuttalBubble: React.FC<RebuttalBubbleProps> = ({ rebuttal, timest
           </p>
         )}
 
-        {/* Parameter bounds adjustment if updated */}
+        {/* Parameter bounds adjustment only if updated numeric bounds exist */}
         {hasUpdatedBounds && (
           <div className="flex items-center gap-2 text-[10px] font-mono bg-slate-950/80 px-2.5 py-1 rounded border border-teal-500/30 text-teal-300">
             <span className="text-slate-400">Calibrated bounds:</span>
             <span className="font-semibold text-teal-200">
-              [{rebuttal.updated_low ?? '—'} &middot; {rebuttal.updated_base ?? '—'} &middot; {rebuttal.updated_high ?? '—'}]
+              [{formatBound(rebuttal.updated_low)} &middot; {formatBound(rebuttal.updated_base)} &middot; {formatBound(rebuttal.updated_high)}]
             </span>
           </div>
         )}

@@ -159,8 +159,8 @@ class SkepticAuditReport(BaseModel):
 
 class Critique(BaseModel):
     skeptic_agent: str = "Skeptic"
-    target_agent: str = "Growth"
-    target_parameter: str = "free_to_paid_conversion"
+    target_agent: str = ""
+    target_parameter: str = ""
     concern: str = "Benchmark check"
     severity: Literal["low", "medium", "high"] = "medium"
 
@@ -168,37 +168,47 @@ class Critique(BaseModel):
     @classmethod
     def normalize_critique_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            if "target_assumption" in data and "target_parameter" not in data:
-                data["target_parameter"] = data["target_assumption"]
-            if "assumption" in data and "target_parameter" not in data:
-                data["target_parameter"] = data["assumption"]
-            if "agent" in data and "target_agent" not in data:
-                data["target_agent"] = data["agent"]
-            if "target_agent" not in data:
-                data["target_agent"] = "Growth"
-            if "skeptic_agent" not in data:
+            # Target parameter normalization across all variations
+            for k in ["target_parameter", "target_assumption", "assumption", "parameter", "param", "metric", "disputed_item", "name"]:
+                if k in data and data[k]:
+                    data["target_parameter"] = str(data[k]).strip()
+                    break
+            # Target agent normalization across all variations
+            for k in ["target_agent", "agent", "specialist", "agent_name", "target", "role"]:
+                if k in data and data[k]:
+                    data["target_agent"] = str(data[k]).strip()
+                    break
+            if "skeptic_agent" not in data or not data["skeptic_agent"]:
                 data["skeptic_agent"] = "Skeptic"
-            if "concern" not in data:
-                data["concern"] = data.get("challenge", "Audited assumption against grounded benchmarks")
+            if "concern" not in data or not data["concern"]:
+                data["concern"] = data.get("challenge") or data.get("critique") or data.get("rationale") or "Audited assumption against grounded benchmarks"
             if "severity" in data:
                 s = str(data["severity"]).strip().lower()
                 data["severity"] = s if s in ["low", "medium", "high"] else "medium"
         return data
 
 class Rebuttal(BaseModel):
-    agent: str = "Growth"
-    parameter: str = "free_to_paid_conversion"
+    agent: str = ""
+    parameter: str = ""
     stance: Literal["concede", "defend", "compromise"] = "defend"
     updated_base: Optional[float] = None
     updated_low: Optional[float] = None
     updated_high: Optional[float] = None
-    rationale: str = "Holding position based on operating telemetry."
+    rationale: str = "Maintained position based on data."
 
     @model_validator(mode="before")
     @classmethod
     def normalize_rebuttal(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            if "rationale" not in data:
+            for k in ["agent", "agent_name", "target_agent", "specialist", "role"]:
+                if k in data and data[k]:
+                    data["agent"] = str(data[k]).strip()
+                    break
+            for k in ["parameter", "target_parameter", "assumption", "param", "metric", "name"]:
+                if k in data and data[k]:
+                    data["parameter"] = str(data[k]).strip()
+                    break
+            if "rationale" not in data or not data["rationale"]:
                 data["rationale"] = data.get("justification") or data.get("explanation") or "Maintained position based on data."
             if "stance" in data:
                 s = str(data["stance"]).lower()
