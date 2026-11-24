@@ -265,7 +265,8 @@ def run_saas_dynamics(
         cannibalization_rate = 0.0
         cost_per_free = 0.0
         free_ticket_rate = 0.0
-        paid_acquisition_lift = 0.98
+        paid_acquisition_lift = params.get("paid_funnel_lift", 1.12)
+        arpu = arpu * 1.05
     elif "pilot" in strategy:
         free_signups_mo = 0.0
         effective_signups = 0.0
@@ -273,8 +274,38 @@ def run_saas_dynamics(
         cannibalization_rate = 0.0
         cost_per_free = 0.0
         free_ticket_rate = 0.0
-        paid_acquisition_lift = 1.0
+        paid_acquisition_lift = 1.05
     elif "status_quo" in strategy:
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.0
+    elif "freemium_acquisition_expansion" in strategy:
+        # Freemium acquisition expansion with usage caps and SEO lift
+        usage_cap_infra_red = params.get("usage_cap_infra_reduction", 0.35)
+        usage_cap_cann_red = params.get("usage_cap_cannibalization_reduction", 0.50)
+        cap_conv_uplift = params.get("cap_conversion_uplift", 0.15)
+        act_drop = params.get("activation_drop_from_gating", 0.10)
+
+        cost_per_free = max(min_infra_floor, cost_per_free * (1.0 - usage_cap_infra_red))
+        cannibalization_rate = max(min_cann_floor, cannibalization_rate * (1.0 - usage_cap_cann_red))
+        free_ticket_rate = max(supp_reduction_floor, free_ticket_rate * supp_reduction_factor)
+        conversion_rate = conversion_rate * (1.0 + cap_conv_uplift)
+        effective_signups = free_signups_mo * 1.20
+        activation_rate = baseline_activation_rate * max(min_act_floor, 1.0 - act_drop)
+        paid_acquisition_lift = 1.05
+    elif "organic_growth_and_seo" in strategy:
+        free_signups_mo = 0.0
+        effective_signups = 0.0
+        conversion_rate = 0.0
+        cannibalization_rate = 0.0
+        cost_per_free = 0.0
+        free_ticket_rate = 0.0
+        paid_acquisition_lift = 1.25
+    elif "status_quo_conversion" in strategy:
         free_signups_mo = 0.0
         effective_signups = 0.0
         conversion_rate = 0.0

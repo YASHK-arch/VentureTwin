@@ -92,7 +92,7 @@ def _generate_finding_draft(
     )
     is_price_increase = (
         dec_type == "price_increase" or
-        any(k in q_str for k in ["price", "raise", "increase price", "starter price", "rate hike", "pricing"])
+        any(k in q_str for k in ["price", "pricing", "rate hike", "increase price", "raise price", "starter price"])
     )
     is_enterprise = (
         dec_type == "enterprise_tier" or
@@ -104,11 +104,17 @@ def _generate_finding_draft(
     )
     is_m_and_a = (
         dec_type == "m_and_a_exit" or
-        any(k in q_str for k in ["sell", "exit", "acquisition", "buyout", "merger", "acquire", "valuation"])
+        (any(k in q_str for k in ["sell", "exit", "buyout", "merger", "valuation"]) or
+         (any(k in q_str for k in ["acquisition", "acquire"]) and not any(k in q_str for k in ["user", "users", "customer", "customers", "traffic", "funnel", "lead", "leads"])))
     )
     is_hiring = (
         dec_type == "hiring_headcount" or
         any(k in q_str for k in ["hire", "hiring", "headcount", "employee", "employees", "staff", "staffing", "payroll"])
+    )
+    is_user_growth = (
+        dec_type == "user_growth" or
+        (any(k in q_str for k in ["user", "users", "growth", "grow", "traffic", "funnel", "signup", "signups", "scale users", "customer acquisition", "user acquisition"]) and
+         not any(k in q_str for k in ["price", "pricing", "sell", "exit", "hire"]))
     )
 
     runway = fin["runway_months"]
@@ -167,6 +173,117 @@ def _generate_finding_draft(
                 ],
                 limitations=["Personal founder decisions have no operational telemetry."],
                 confidence=0.95
+            )
+        else:
+            # Corporate Strategic Business Initiatives (e.g. platform evolution, ecosystem restructuring, operational scale)
+            c_name = data.get("company_name", "the company") if data else "the company"
+            if agent_key == "cfo":
+                claim = (
+                    f"Strategic evaluation confirms capital reserves of ${cash:,.0f} and a {runway:.1f}-month baseline runway "
+                    f"support executing high-impact business initiatives, provided incremental investment does not breach "
+                    f"the mandatory {min_runway:.1f}-month safety floor."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = [
+                    DraftAssumption(
+                        name="paid_funnel_lift",
+                        low=1.05,
+                        base=1.12,
+                        high=1.20,
+                        unit="ratio",
+                        basis="financials.mrr",
+                        rationale="Revenue expansion and monetization uplift from strategic platform initiatives"
+                    )
+                ]
+            elif agent_key == "growth":
+                claim = (
+                    f"Expanding core capabilities and platform reach broadens customer acquisition beyond current "
+                    f"{visitors:,} monthly visitors and accelerates partner distribution velocity."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = [
+                    DraftAssumption(
+                        name="free_to_paid_conversion",
+                        low=0.012,
+                        base=0.022,
+                        high=0.035,
+                        unit="rate",
+                        basis="",
+                        rationale="Target conversion velocity across expanded platform offerings"
+                    )
+                ]
+            elif agent_key == "cto":
+                claim = (
+                    f"Supporting broader business capabilities and integrated services requires modular service architecture, "
+                    f"API partner rate-limiting, and hardened security compliance on top of our ${cloud_cost:,.2f}/mo infrastructure baseline."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = [
+                    DraftAssumption(
+                        name="usage_cap_infra_reduction",
+                        low=0.15,
+                        base=0.25,
+                        high=0.35,
+                        unit="rate",
+                        basis="infrastructure.monthly_cloud_cost",
+                        rationale="Infrastructure efficiency and compute isolation for partner workloads"
+                    )
+                ]
+            elif agent_key == "product":
+                claim = (
+                    "Evolving into an integrated business ecosystem requires unified merchant workflows, seamless "
+                    "financial and app integrations, and tiered value packaging to protect core product simplicity."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = [
+                    DraftAssumption(
+                        name="activation_drop_from_gating",
+                        low=0.04,
+                        base=0.08,
+                        high=0.15,
+                        unit="rate",
+                        basis="",
+                        rationale="Workflow friction minimized via intuitive merchant console UX"
+                    )
+                ]
+            elif agent_key == "customer":
+                claim = (
+                    f"Deepening merchant solutions across our {paying} accounts expands customer lifetime value, "
+                    f"provided partner onboarding and dedicated support pathways are established to prevent merchant friction."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = [
+                    DraftAssumption(
+                        name="paid_to_free_cannibalization",
+                        low=0.02,
+                        base=0.04,
+                        high=0.07,
+                        unit="rate",
+                        basis="",
+                        rationale="Retention stability under platform ecosystem expansion"
+                    )
+                ]
+            elif agent_key == "skeptic":
+                claim = (
+                    "Platform and financial services expansions face complex partner integration timelines and regulatory "
+                    "overhead; execution must be staged in gated milestones before committing extensive balance sheet capital."
+                )
+                recommendation = "proceed_with_limits"
+                assumptions = []
+
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation=recommendation,
+                assumptions=assumptions,
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="financials.cash_balance",
+                        snippet=f"Starting cash balance: ${cash:,.2f}, runway: {runway:.1f} months, paying accounts: {paying}."
+                    )
+                ],
+                limitations=["Staged milestone reviews required every 60 days."],
+                confidence=0.85
             )
 
     # =========================================================================
@@ -763,6 +880,181 @@ def _generate_finding_draft(
                 ],
                 limitations=["Requires clear sprint prioritisation."],
                 confidence=0.84
+            )
+
+    # =========================================================================
+    # DOMAIN 0B: USER GROWTH / ACQUISITION (e.g. "What strategy should we execute to increase number of users?")
+    # =========================================================================
+    if is_user_growth and not (is_enterprise or is_churn or "price" in q_str):
+        if agent_key == "cfo":
+            claim = (
+                f"Increasing user count via a freemium expansion strategy is financially viable only if the incremental infrastructure cost per free user is strictly capped and the free-to-paid conversion rate is optimized to offset the burn. With a current runway of {runway:.1f} months and a target minimum of {min_runway:.1f} months, we have a {runway - min_runway:.1f}-month buffer. However, unmonetized free users directly erode gross margin. We must ensure that the cost of serving free users does not exceed the lifetime value contribution of the converted cohort, while maintaining net burn below the threshold that would breach the {min_runway:.1f}-month runway floor."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[
+                    DraftAssumption(
+                        name="infra_cost_per_free_user",
+                        low=0.10,
+                        base=0.25,
+                        high=0.50,
+                        unit="usd/user/month",
+                        basis="infrastructure.monthly_cloud_cost",
+                        rationale="Marginal infrastructure servicing cost per active free user"
+                    ),
+                    DraftAssumption(
+                        name="free_to_paid_conversion",
+                        low=0.005,
+                        base=0.010,
+                        high=0.020,
+                        unit="rate",
+                        basis="",
+                        rationale="Target conversion rate required to offset marginal burn"
+                    )
+                ],
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="financials.cash_balance",
+                        snippet=f"Cash balance: ${cash:,.2f}, monthly burn: ${fin.get('monthly_burn_net', 125000):,.2f}, runway: {runway:.1f} mo."
+                    )
+                ],
+                limitations=["Requires strict capping of free tier infrastructure consumption."],
+                confidence=0.85
+            )
+        elif agent_key == "growth":
+            claim = (
+                "Implement a freemium tier with usage caps and feature gating to boost free-to-paid conversion, while scaling organic acquisition through AI-powered content and SEO to increase monthly free sign-ups."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[
+                    DraftAssumption(
+                        name="monthly_free_signups",
+                        low=1500.0,
+                        base=3000.0,
+                        high=5000.0,
+                        unit="users/month",
+                        basis="funnel.monthly_visitors",
+                        rationale="Organic top-of-funnel acquisition velocity from SEO and content"
+                    ),
+                    DraftAssumption(
+                        name="free_to_paid_conversion",
+                        low=0.010,
+                        base=0.018,
+                        high=0.030,
+                        unit="rate",
+                        basis="",
+                        rationale="Conversion uplift through usage caps and feature-gated upgrade prompts"
+                    )
+                ],
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="funnel.monthly_visitors",
+                        snippet=f"Current monthly visitors: {visitors:,}."
+                    )
+                ],
+                limitations=["Assumes organic SEO growth without heavy paid acquisition expenditure."],
+                confidence=0.78
+            )
+        elif agent_key == "cto":
+            claim = (
+                f"Serving expanded user volume requires multi-tenant container isolation and database caching to keep incremental cloud compute below $0.80 per free user on our current ${cloud_cost:,.0f}/mo baseline."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[
+                    DraftAssumption(
+                        name="infra_cost_per_free_user",
+                        low=0.15,
+                        base=0.35,
+                        high=0.80,
+                        unit="usd/user/month",
+                        basis="infrastructure.monthly_cloud_cost",
+                        rationale="Compute scaling constraint for free user workloads"
+                    )
+                ],
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="infrastructure.monthly_cloud_cost",
+                        snippet=f"Baseline cloud spend: ${cloud_cost:,.2f}/mo."
+                    )
+                ],
+                limitations=["Requires serverless throttling on free tier API endpoints."],
+                confidence=0.85
+            )
+        elif agent_key == "product":
+            claim = (
+                "Package essential workflows into the self-serve tier while placing clear usage barriers on advanced features and team collaboration to drive natural upgrade triggers."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[
+                    DraftAssumption(
+                        name="activation_drop_from_gating",
+                        low=0.05,
+                        base=0.10,
+                        high=0.18,
+                        unit="rate",
+                        basis="",
+                        rationale="Minimal friction introduced by feature gating"
+                    )
+                ],
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="customers.plans",
+                        snippet="Plans monitored: Free, Starter, Pro."
+                    )
+                ],
+                limitations=["Requires telemetry tracking on feature gate drop-offs."],
+                confidence=0.82
+            )
+        elif agent_key == "customer":
+            claim = (
+                "High influx of new users requires automated onboarding and community deflection to prevent support ticket inflation from degrading response times for paying customers."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[
+                    DraftAssumption(
+                        name="free_user_ticket_rate",
+                        low=0.01,
+                        base=0.02,
+                        high=0.04,
+                        unit="ratio",
+                        basis="",
+                        rationale="Support load generated per free active account"
+                    )
+                ],
+                evidence=[
+                    Evidence(
+                        source_type="company_data",
+                        source_ref="customers.total_paying",
+                        snippet=f"Current paying customer base: {paying} accounts."
+                    )
+                ],
+                limitations=["Assumes ticket deflection via AI help center."],
+                confidence=0.80
+            )
+        elif agent_key == "skeptic":
+            claim = (
+                "User acquisition models typically underestimate top-of-funnel free user support costs and overestimate free-to-paid conversion velocity without paid marketing spend."
+            )
+            return AgentFindingDraft(
+                claim=claim,
+                recommendation="proceed_with_limits",
+                assumptions=[],
+                evidence=[],
+                limitations=["Recommend setting strict 60-day milestone gates before scaling unmonetized cohorts."],
+                confidence=0.85
             )
 
     # =========================================================================

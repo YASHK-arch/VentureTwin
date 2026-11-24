@@ -598,6 +598,8 @@ class Supervisor:
             strategies = ["A_calibrated_hiring_12pct", "B_aggressive_hiring_25pct", "C_status_quo_hiring"]
         elif dec_type == "m_and_a_exit":
             strategies = ["A_status_quo_independent_scale", "B_structured_earn_out", "C_immediate_sale_at_discount"]
+        elif dec_type == "user_growth":
+            strategies = ["A_freemium_acquisition_expansion", "B_organic_growth_and_seo", "C_status_quo_conversion"]
         elif dec_type == "strategic_decision":
             strategies = ["A_adopt_proposal", "B_targeted_pilot", "C_status_quo"]
         elif dec_type == "max_expenditure":
@@ -642,6 +644,7 @@ class Supervisor:
         # Dynamic strategy ranking, sensitivity, and flip point
         from report.decision_logic import rank_strategies, compute_dynamic_strategy_comparison
         ranked = rank_strategies(sim_runs, state.decision.constraints, company_data=company_data)
+        self._ranked_cache = ranked
         comparison = compute_dynamic_strategy_comparison(ranked, reconciled, company_data)
         self.tornado_data = comparison["margin_tornado"]
         self.flip_point_info = comparison["flip_point"]
@@ -652,9 +655,93 @@ class Supervisor:
 
         return {"status": "simulated", "runs_count": len(sim_runs)}
 
+    async def _generate_dynamic_executive_synthesis(
+        self, state: WorkflowState, company_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Dynamically synthesizes the executive decision report using the LLM when in real/record mode.
+        Tailors recommendation title, executive synthesis, and key actions directly to the specific
+        user question, company ground truth, and specialist agent findings.
+        """
+        if not self.llm_client or self.llm_client.mode not in ["real", "record"]:
+            return None
+
+        if getattr(state, "executive_synthesis", None):
+            return state.executive_synthesis
+
+        try:
+            from agents.llm_client import llm_call
+            from state.schemas import ExecutiveSynthesisOutput
+
+            query = state.decision.question
+            fin = company_data.get("financials", {})
+            comp_name = company_data.get("company_name", "the company")
+            mrr_val = fin.get("mrr", 0.0)
+            cash_val = fin.get("cash_balance", 0.0)
+            runway_val = fin.get("runway_months", 0.0)
+            min_runway = float(state.decision.constraints.get("min_runway_months", 10.0))
+
+            ranked = getattr(self, "_ranked_cache", None)
+            if not ranked and state.simulation_runs:
+                from report.decision_logic import rank_strategies
+                ranked = rank_strategies(state.simulation_runs, state.decision.constraints, company_data=company_data)
+
+            top_strat = ranked[0] if ranked else None
+            top_strat_name = top_strat.strategy if top_strat else "status_quo"
+            top_net_contrib = top_strat.net_contribution_12 if top_strat else 0.0
+            top_runway_12 = top_strat.runway_months_12 if top_strat else runway_val
+            is_feasible = top_strat.is_feasible if top_strat else True
+
+            findings_bullets = []
+            for f in state.findings:
+                clean_claim = f.claim.strip()
+                lims = f"; Limitations: {', '.join(f.limitations)}" if f.limitations else ""
+                findings_bullets.append(f"- {f.agent.upper()} (Verdict: {f.recommendation}, Conf: {int(f.confidence * 100)}%): \"{clean_claim}\"{lims}")
+            findings_text = "\n".join(findings_bullets) if findings_bullets else "- None recorded."
+
+            prompt = (
+                f"You are the Executive Council Chair synthesizing the definitive Executive Decision Report for the Board of Directors of {comp_name}.\n\n"
+                f"Strategic Question: \"{query}\"\n\n"
+                f"Ground-Truth Financial Telemetry:\n"
+                f"- Company: {comp_name}\n"
+                f"- Monthly Recurring Revenue: ${mrr_val:,.2f}\n"
+                f"- Cash Reserves: ${cash_val:,.2f}\n"
+                f"- Baseline Runway: {runway_val:.1f} months\n"
+                f"- Mandatory Runway Safety Threshold: {min_runway:.1f} months\n\n"
+                f"Executive Specialist Agent Findings & Guardrails:\n"
+                f"{findings_text}\n\n"
+                f"Quantitative Simulation Engine Outcome:\n"
+                f"- Evaluated Strategy: {top_strat_name.replace('_', ' ')}\n"
+                f"- Projected 12-Month Net Financial Contribution: ${top_net_contrib:,.2f}\n"
+                f"- Projected 12-Month Cash Runway: {top_runway_12:.1f} months\n"
+                f"- Runway Constraint Satisfied: {is_feasible}\n\n"
+                "Instructions:\n"
+                "1. 'recommendation_title': A sharp, executive verdict title answering the specific question (max 12 words), e.g., 'Proceed with Limits: Restructure into Tiered Customer Success Operating Model' or 'Proceed with Limits: Gated Freemium & Organic Acquisition Expansion'. Must reflect the concrete operational domain. NEVER use generic placeholders like 'Adopt Proposal' or 'A adopt proposal'.\n"
+                "2. 'executive_summary': A cohesive 2 to 3 paragraph executive strategic synthesis:\n"
+                f"   - Paragraph 1: Direct strategic recommendation answering the query, citing exact quantitative metrics (${top_net_contrib:,.2f} 12-month net contribution, {top_runway_12:.1f} months cash runway vs {min_runway:.1f} mo safety threshold).\n"
+                "   - Paragraph 2: Synthesize the specialist functional leaders' positions into a unified strategic plan (integrating CFO's financial guardrails, CTO's infrastructure limits, Growth's acquisition targets, and Customer Success/Product operational models) without mechanical quote dumps or semicolon lists.\n"
+                "   - Paragraph 3: Detail operational guardrails, risk mitigations, and review checkpoints established by the Skeptic and council leaders.\n"
+                "3. 'key_actions': 3 to 4 actionable operational milestones for execution."
+            )
+
+            draft: ExecutiveSynthesisOutput = await llm_call(
+                prompt=prompt,
+                response_model=ExecutiveSynthesisOutput,
+                system_prompt="You coordinate executive boardroom reports. Output strictly valid JSON matching the schema.",
+                client=self.llm_client,
+                metadata={"agent_key": "supervisor", "task_kind": "executive_synthesis"}
+            )
+            res = draft.model_dump()
+            state.executive_synthesis = res
+            return res
+        except Exception as e:
+            logger.warning(f"Dynamic LLM executive synthesis call failed: {e}. Falling back to deterministic synthesis.")
+            return None
+
     async def _run_report_draft_task(self, task: Task, state: WorkflowState) -> Any:
         company_data = self.company_data or load_company_data()
         all_degraded = list(dict.fromkeys(state.degraded_agents + state.recovered_agents))
+        llm_synthesis = await self._generate_dynamic_executive_synthesis(state, company_data)
         draft_report = build_consolidated_report(
             decision=state.decision,
             sim_runs=state.simulation_runs,
@@ -666,7 +753,8 @@ class Supervisor:
             mc_summary=getattr(self, "mc_summary", None),
             degraded_agents=all_degraded,
             company_data=company_data,
-            findings=state.findings
+            findings=state.findings,
+            llm_synthesis=llm_synthesis
         )
         state.draft_report = draft_report
         state.report = draft_report
@@ -736,6 +824,10 @@ class Supervisor:
         company_data = self.company_data or load_company_data()
 
         all_degraded = list(dict.fromkeys(state.degraded_agents + state.recovered_agents))
+        llm_synthesis = getattr(state, "executive_synthesis", None)
+        if not llm_synthesis:
+            llm_synthesis = await self._generate_dynamic_executive_synthesis(state, company_data)
+
         final_report = build_consolidated_report(
             decision=state.decision,
             sim_runs=state.simulation_runs,
@@ -747,7 +839,8 @@ class Supervisor:
             mc_summary=getattr(self, "mc_summary", None),
             degraded_agents=all_degraded,
             company_data=company_data,
-            findings=state.findings
+            findings=state.findings,
+            llm_synthesis=llm_synthesis
         )
 
         all_passed = all(r.status == "passed" for r in state.verification_results)

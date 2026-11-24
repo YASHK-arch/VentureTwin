@@ -242,6 +242,20 @@ class Report(BaseModel):
     confidence: Literal["Low", "Medium", "High"]
     disclaimers: List[str] = Field(default_factory=list)
 
+class ExecutiveSynthesisOutput(BaseModel):
+    recommendation_title: str = Field(
+        ...,
+        description="Dynamic executive verdict title answering the question (e.g. 'Proceed with Limits: Tiered Customer Success Model with AI Deflection')"
+    )
+    executive_summary: str = Field(
+        ...,
+        description="2-3 paragraph cohesive executive strategic synthesis weaving quantitative simulation results, specialist leadership alignment, and operational guardrails."
+    )
+    key_actions: List[str] = Field(
+        default_factory=list,
+        description="Immediate strategic milestones and execution steps."
+    )
+
 class DecisionRecord(BaseModel):
     decision_id: str
     snapshot: Dict[str, Any]
