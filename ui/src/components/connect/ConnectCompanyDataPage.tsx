@@ -94,6 +94,22 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
     }
   };
 
+  const agentConnectorGroups: Record<string, string[]> = {
+    cfo: ['stripe', 'quickbooks'],
+    growth: ['hubspot', 'mixpanel'],
+    cto: ['github', 'datadog'],
+    customer: ['intercom', 'zendesk'],
+    product: ['amplitude', 'linear'],
+    skeptic: ['firecrawl', 'brave_search'],
+  };
+
+  const connectedAgentsCount = Object.values(agentConnectorGroups).filter((cids) =>
+    cids.some((cid) => {
+      const st = connectorStatuses.find((s) => s.connector_id === cid);
+      return st?.status === 'connected' || st?.status === 'sandbox_connected' || st?.status === 'syncing';
+    })
+  ).length;
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
@@ -171,6 +187,10 @@ export const ConnectCompanyDataPage: React.FC<ConnectCompanyDataPageProps> = ({
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#cccccc]">
               Executive Agent Operational Connectors
             </h2>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{connectedAgentsCount} / 6 Agents Connected</span>
+            </span>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-purple-900/40 text-purple-300 border border-purple-700/50">
               Active Integration Connectors
             </span>
