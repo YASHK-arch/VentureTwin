@@ -30,6 +30,14 @@ class SupervisorRoutingDecision(BaseModel):
         ...,
         description="Concise strategic context and core intent extracted from boardroom question"
     )
+    decision_type: str = Field(
+        default="strategic_decision",
+        description="Dynamic decision classification e.g. product_portfolio, revenue_restructure, packaging_tier, pricing_strategy, etc."
+    )
+    strategic_objective: Optional[str] = Field(
+        default=None,
+        description="Tailored executive objective statement for the multi-agent analysis"
+    )
     selected_specialists: List[str] = Field(
         ...,
         description="List of specialist agent keys (cfo, growth, cto, customer, product) involved in DAG"
@@ -64,6 +72,26 @@ def deterministic_supervisor_routing(
     mrr_val = fin.get("mrr", 110370)
     runway_val = fin.get("runway_months", 13.2)
 
+    # 0. Product Portfolio / Unified Merchant Operating System / Commerce Tools Reorganization
+    if any(k in q_lower for k in [
+        "reorganize", "product portfolio", "portfolio", "operating system", "merchant operating system",
+        "commerce tools", "platform evolution", "unify", "unified", "separate commerce", "merchant solutions"
+    ]):
+        return SupervisorRoutingDecision(
+            context_summary="Product portfolio reorganization around a unified merchant operating system vs disjoint commerce tools",
+            decision_type="product_portfolio_architecture",
+            strategic_objective=f"Evaluate product packaging coherence, developer platform ecosystem, merchant adoption velocity, and unit economics for: {query}",
+            selected_specialists=["product", "cto", "growth", "cfo"],
+            specialist_directives={
+                "product": "Define unified merchant OS tier packaging, eliminate fragmented tool silos, and establish cohesive merchant UX.",
+                "cto": "Assess API consolidation, GraphQL schema unification, data consistency, and integration overhead across tools.",
+                "growth": "Forecast merchant retention uplift, expansion GMV velocity, and ecosystem lock-in from an integrated OS.",
+                "cfo": "Model subscription ARR stability vs transaction-linked revenue share volatility and operating margin impacts."
+            },
+            reasoning="Reorganizing disparate commerce tools into a cohesive merchant OS is a systemic product-platform transformation. Product defines the unified packaging, CTO architects the consolidated engine, Growth drives merchant adoption, and CFO safeguards cash margins.",
+            source="deterministic_router"
+        )
+
     # 1. Broad Freemium / Free Plan / Tier Overhaul (All 5 Specialists)
     if any(k in q_lower for k in [
         "free plan", "freemium", "free tier", "launch a free", "packaging overhaul",
@@ -71,6 +99,8 @@ def deterministic_supervisor_routing(
     ]):
         return SupervisorRoutingDecision(
             context_summary="Freemium & Free Plan packaging overhaul with cross-functional unit economics impact",
+            decision_type="free_plan",
+            strategic_objective="Evaluate financial runway, acquisition velocity, infra strain, and cannibalization of launching a free tier.",
             selected_specialists=["cfo", "growth", "cto", "customer", "product"],
             specialist_directives={
                 "cfo": f"Model gross margin compression, runway impact (current {runway_val} mo), and cash burn from unpaid users.",
@@ -242,6 +272,8 @@ async def route_decision_specialists(
         "4. Output strictly valid JSON matching this schema:\n"
         "{\n"
         '  "context_summary": "<brief summary of the question context>",\n'
+        '  "decision_type": "<dynamic semantic slug e.g. product_portfolio_architecture, revenue_model_restructure, pricing_strategy, freemium_packaging, hiring_headcount, cloud_infrastructure>",\n'
+        '  "strategic_objective": "<concise executive objective statement tailored to company and question>",\n'
         '  "selected_specialists": ["<agent1>", "<agent2>", ...],\n'
         '  "specialist_directives": {\n'
         '    "<agent1>": "<specific analysis directive>",\n'
@@ -356,6 +388,8 @@ async def route_decision_specialists(
 
             decision = SupervisorRoutingDecision(
                 context_summary=parsed.get("context_summary", query),
+                decision_type=parsed.get("decision_type") or "strategic_decision",
+                strategic_objective=parsed.get("strategic_objective") or f"Evaluate strategic options for: {query}",
                 selected_specialists=sorted_specs,
                 specialist_directives=directives,
                 reasoning=parsed.get("reasoning", f"Selected by Groq Supervisor ({used_model}) based on boardroom query context."),

@@ -363,6 +363,13 @@ async def route_orchestration(req: RoutingRequest):
 @app.post("/api/decisions")
 async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTasks):
     """Submits a strategic decision query and launches the multi-agent workflow."""
+    from services.supervisor_groq import route_decision_specialists
+    company_data = load_company_data()
+
+    # 1. Engage Groq Supervisor semantic routing layer first to understand context and select specialists
+    routing = await route_decision_specialists(req.query, company_data=company_data)
+
+    # 2. Parse decision query with active company context
     decision = parse_decision_query(req.query, req.constraints, allow_all=True)
     if decision.type == "unsupported":
         raise HTTPException(
@@ -378,10 +385,15 @@ async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTask
             "clarification_prompt": decision.classification.clarification_prompt if decision.classification else decision.objective,
             "options": decision.classification.clarification_options if decision.classification else []
         }
-    
-    from services.supervisor_groq import route_decision_specialists
-    company_data = load_company_data()
-    routing = await route_decision_specialists(req.query, company_data=company_data)
+
+    # 3. Enrich decision dynamically with Groq's semantic context
+    if routing.decision_type and routing.decision_type != "strategic_decision":
+        decision.type = routing.decision_type
+    if routing.strategic_objective:
+        decision.objective = routing.strategic_objective
+    elif routing.context_summary:
+        decision.objective = f"Evaluate {routing.context_summary} for: {req.query}"
+
     if req.selected_specialists:
         valid_specs = [s for s in ["cfo", "growth", "cto", "customer", "product"] if s in req.selected_specialists]
         if valid_specs:
@@ -389,6 +401,8 @@ async def submit_decision(req: DecisionRequest, background_tasks: BackgroundTask
 
     decision.metadata["selected_specialists"] = routing.selected_specialists
     decision.metadata["routing"] = routing.model_dump()
+    decision.metadata["context_summary"] = routing.context_summary
+    decision.metadata["specialist_directives"] = routing.specialist_directives
 
     from agents.llm_client import LLMClient
     supervisor = Supervisor(llm_client=LLMClient(), company_data=company_data)

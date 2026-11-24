@@ -381,13 +381,31 @@ def parse_decision_query(
 
         # Dynamic loaded company name check
         active_company_name = None
+        company_aliases = set()
         try:
-            from data.loader import load_company_data
-            cdata = load_company_data()
-            if cdata and "company_name" in cdata:
-                active_company_name = str(cdata["company_name"]).lower().strip()
+            from services.company_context_store import get_active_company_context
+            ctx = get_active_company_context()
+            if ctx and "company_name" in ctx and ctx["company_name"]:
+                active_company_name = str(ctx["company_name"]).lower().strip()
         except Exception:
             pass
+        if not active_company_name:
+            try:
+                from data.loader import load_company_data
+                cdata = load_company_data()
+                if cdata and "company_name" in cdata:
+                    active_company_name = str(cdata["company_name"]).lower().strip()
+            except Exception:
+                pass
+
+        if active_company_name:
+            company_aliases.add(active_company_name)
+            base_name = re.sub(r'[\(\[].*?[\)\]]', '', active_company_name).replace("inc.", "").replace("inc", "").strip()
+            if base_name:
+                company_aliases.add(base_name)
+                for part in base_name.split():
+                    if len(part) >= 3:
+                        company_aliases.add(part)
 
         # Standard corporate, strategic, commercial, operational, product, and financial terminology
         saas_decision_terms = [
@@ -398,9 +416,10 @@ def parse_decision_query(
             "customers", "account", "accounts", "b2b", "b2c", "smb", "enterprise",
             # Strategy, Direction & Evolution
             "strategy", "strategic", "decision", "evolve", "evolution", "transform", "transformation",
-            "transition", "restructure", "restructuring", "pivot", "roadmap", "vision", "initiative",
-            "expansion", "scale", "scale-up", "scaling", "growth", "grow", "opportunity", "positioning",
-            "differentiation", "competitive", "competition", "competitor", "market", "markets", "industry",
+            "transition", "restructure", "restructuring", "reorganize", "reorganizing", "portfolio",
+            "pivot", "roadmap", "vision", "initiative", "expansion", "scale", "scale-up", "scaling",
+            "growth", "grow", "opportunity", "positioning", "differentiation", "competitive",
+            "competition", "competitor", "market", "markets", "industry", "tools", "tool", "unified", "unify",
             # Financial, Capital & Economics
             "financial", "finance", "banking", "fintech", "services", "service", "revenue", "mrr",
             "arr", "gmv", "volume", "monetize", "monetization", "margin", "margins", "profit",
@@ -428,9 +447,10 @@ def parse_decision_query(
         ]
 
         matches_business_terms = any(re.search(rf"\b{re.escape(term)}\b", q_lower) for term in saas_decision_terms)
-        matches_active_company = bool(active_company_name and active_company_name in q_lower)
+        matches_active_company = any(alias in q_lower for alias in company_aliases)
 
-        is_strategic = (matches_business_terms or matches_active_company) and not is_obvious_trivia
+        # In allow_all mode, accept ANY query that is not explicit non-business trivia
+        is_strategic = not is_obvious_trivia
 
         if not is_strategic:
             display_company = active_company_name.title() if active_company_name else "NimbusDesk"
