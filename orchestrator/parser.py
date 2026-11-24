@@ -367,32 +367,81 @@ def parse_decision_query(
 
     # 2. If allow_all=True (frontend interaction), validate that query is a business/strategic decision
     if allow_all:
-        saas_decision_terms = [
-            "plan", "tier", "free", "freemium", "pricing", "price", "charge", "cost", "fee",
-            "subscription", "discount", "starter", "pro", "enterprise", "churn", "retention",
-            "cancel", "customer", "support", "ticket", "mrr", "arr", "revenue", "runway",
-            "cash", "burn", "margin", "growth", "funnel", "conversion", "trial", "signup",
-            "visitor", "traffic", "acquisition", "cac", "ltv", "infra", "infrastructure",
-            "cloud", "server", "scale", "launch", "introduce", "expand", "gating", "caps",
-            "limit", "feature", "usage", "hire", "hiring", "headcount", "employee", "employees",
-            "staff", "staffing", "recruit", "recruiting", "payroll", "team", "engineer", "engineers",
-            "sales", "marketing", "raise", "increase", "cut", "lower", "reduce", "optimize",
-            "strategy", "decision", "sell", "sale", "exit", "acquire", "acquisition", "buyout",
-            "merger", "valuation", "fundraise", "fundraising", "investor", "investment",
-            "equity", "company", "budget", "spend", "spending", "expenditure", "afford", "allocate", "allocation",
-            "percent", "percentage", "how many", "how much", "what percent", "automation"
+        # Check for explicit trivia / non-business chit-chat
+        trivia_patterns = [
+            r"\bcapital\s+of\b", r"\bweather\b", r"\btemperature\b", r"\brecipe\b",
+            r"\bcook\b", r"\bdinner\b", r"\blunch\b", r"\bbreakfast\b", r"\beat\b",
+            r"\bjoke\b", r"\briddle\b", r"\bpoem\b", r"\bsong\b", r"\blyrics\b",
+            r"\bmovie\b", r"\bactor\b", r"\bactress\b", r"\bcelebrity\b", r"\bhoroscope\b",
+            r"\bworld\s+cup\b", r"\bolympics\b", r"\bsuper\s+bowl\b", r"\bfootball\b",
+            r"\bbasketball\b", r"\bcricket\b", r"\bwho\s+won\b", r"\bpresident\s+of\b",
+            r"\bprime\s+minister\b"
         ]
-        is_strategic = any(re.search(rf"\b{re.escape(term)}\b", q_lower) for term in saas_decision_terms)
-        
+        is_obvious_trivia = any(re.search(pat, q_lower) for pat in trivia_patterns)
+
+        # Dynamic loaded company name check
+        active_company_name = None
+        try:
+            from data.loader import load_company_data
+            cdata = load_company_data()
+            if cdata and "company_name" in cdata:
+                active_company_name = str(cdata["company_name"]).lower().strip()
+        except Exception:
+            pass
+
+        # Standard corporate, strategic, commercial, operational, product, and financial terminology
+        saas_decision_terms = [
+            # Business, Commerce & Ecosystem
+            "business", "commerce", "e-commerce", "retail", "merchant", "merchants", "platform",
+            "operating system", "ecosystem", "marketplace", "channel", "partner", "partners",
+            "partnership", "partnerships", "vendor", "vendors", "client", "clients", "customer",
+            "customers", "account", "accounts", "b2b", "b2c", "smb", "enterprise",
+            # Strategy, Direction & Evolution
+            "strategy", "strategic", "decision", "evolve", "evolution", "transform", "transformation",
+            "transition", "restructure", "restructuring", "pivot", "roadmap", "vision", "initiative",
+            "expansion", "scale", "scale-up", "scaling", "growth", "grow", "opportunity", "positioning",
+            "differentiation", "competitive", "competition", "competitor", "market", "markets", "industry",
+            # Financial, Capital & Economics
+            "financial", "finance", "banking", "fintech", "services", "service", "revenue", "mrr",
+            "arr", "gmv", "volume", "monetize", "monetization", "margin", "margins", "profit",
+            "profitability", "burn", "runway", "cash", "capital", "cost", "costs", "spend", "spending",
+            "budget", "expenditure", "afford", "affordability", "fundraise", "fundraising", "investor",
+            "investors", "investment", "investments", "equity", "valuation", "m&a", "sell", "sale",
+            "exit", "buyout", "merger", "acquire", "acquisition", "allocate", "allocation", "cac", "ltv", "arpu",
+            # Packaging, Pricing & Product
+            "plan", "plans", "tier", "tiers", "free", "freemium", "pricing", "price", "prices",
+            "charge", "fee", "fees", "subscription", "subscriptions", "discount", "starter", "pro",
+            "product", "products", "offering", "offerings", "solution", "solutions", "feature",
+            "features", "capability", "capabilities", "system", "systems", "gating", "caps",
+            "limit", "limits", "usage",
+            # Infrastructure & Technology
+            "infra", "infrastructure", "cloud", "server", "servers", "database", "tech", "technology",
+            "architecture", "automation", "latency", "compute", "hosting",
+            # Operations, Team & Retention
+            "operation", "operations", "operational", "support", "ticket", "tickets", "csat",
+            "retention", "retain", "churn", "cancel", "cancellation", "hire", "hiring", "headcount",
+            "employee", "employees", "staff", "staffing", "recruit", "recruiting", "payroll", "team",
+            "engineer", "engineers", "sales", "marketing", "workforce",
+            # Action verbs & qualifiers
+            "launch", "introduce", "expand", "raise", "increase", "cut", "lower", "reduce",
+            "optimize", "optimization", "percent", "percentage", "how many", "how much", "what percent"
+        ]
+
+        matches_business_terms = any(re.search(rf"\b{re.escape(term)}\b", q_lower) for term in saas_decision_terms)
+        matches_active_company = bool(active_company_name and active_company_name in q_lower)
+
+        is_strategic = (matches_business_terms or matches_active_company) and not is_obvious_trivia
+
         if not is_strategic:
+            display_company = active_company_name.title() if active_company_name else "NimbusDesk"
             return Decision(
                 id=dec_id,
                 type="unsupported",
                 question=query,
                 objective=(
                     f"Out of Domain: '{query}' is not a SaaS business strategy decision. "
-                    "VentureTwin is an executive digital twin for NimbusDesk evaluating pricing, packaging, "
-                    "churn reduction, infrastructure scaling, hiring headcount, M&A/exit, and financial runway strategies."
+                    f"VentureTwin is an executive digital twin for {display_company} evaluating pricing, packaging, "
+                    "platform evolution, financial restructuring, churn reduction, infrastructure scaling, hiring headcount, M&A/exit, and financial runway strategies."
                 ),
                 constraints=effective_constraints,
                 classification=DecisionClassification(category="out_of_domain")
@@ -487,10 +536,15 @@ def parse_decision_query(
                 )
             )
 
-        # Standard Domains: M&A, Freemium, Enterprise, Churn, Price Increase, General Headcount
-        if any(re.search(rf"\b{re.escape(k)}\b", q_lower) for k in [
-            "sell", "exit", "acquisition", "buyout", "merger", "acquire", "valuation"
-        ]):
+        # Standard Domains: M&A, Freemium, Enterprise, Churn, User Growth, Price Increase, General Headcount
+        if (
+            any(re.search(rf"\b{re.escape(k)}\b", q_lower) for k in [
+                "sell", "exit", "buyout", "merger", "valuation"
+            ]) or (
+                any(re.search(rf"\b{re.escape(k)}\b", q_lower) for k in ["acquisition", "acquire"]) and
+                not any(k in q_lower for k in ["user", "users", "customer", "customers", "traffic", "funnel", "client", "clients", "lead", "leads"])
+            )
+        ):
             dec_type = "m_and_a_exit"
             obj = f"Evaluate enterprise valuation multiples, cash reserves ($1.65M, 13.2mo runway), and long-term shareholder value creation for: {query}"
             subtype = "m_and_a_exit"
@@ -509,14 +563,20 @@ def parse_decision_query(
             obj = f"Evaluate retention dynamics, support load, and customer lifetime value for: {query}"
             subtype = "churn_reduction"
         elif any(re.search(pat, q_lower) for pat in [
-            r"\bprice\b", r"\bpricing\b", r"\braise\b", r"\bincrease\b",
-            r"\bcut\b", r"\bdiscount\b", r"\bbilling\b", r"\brate hike\b",
-            r"\bbilling rate\b", r"\bsubscription rate\b", r"\bstarter price\b",
-            r"\bprice increase\b", r"\bprice cut\b"
+            r"\bprice\b", r"\bpricing\b", r"\braise\s+price\b", r"\bincrease\s+price\b",
+            r"\bcut\s+price\b", r"\bprice\s+cut\b", r"\bdiscount\b", r"\bbilling\b", r"\brate\s+hike\b",
+            r"\bbilling\s+rate\b", r"\bsubscription\s+rate\b", r"\bstarter\s+price\b",
+            r"\bprice\s+increase\b", r"\bfee\s+increase\b", r"\braise\s+rates?\b", r"\bincrease\s+rates?\b"
         ]):
             dec_type = "price_increase"
             obj = f"Evaluate revenue elasticity, customer churn risk, and runway implications of: {query}"
             subtype = "price_increase"
+        elif any(re.search(rf"\b{re.escape(k)}\b", q_lower) for k in [
+            "user", "users", "growth", "grow", "traffic", "funnel", "signup", "signups", "scale users", "customer acquisition", "user acquisition"
+        ]) and not any(k in q_lower for k in ["price", "pricing", "fee", "tier rate"]):
+            dec_type = "user_growth"
+            obj = f"Evaluate user acquisition channels, conversion efficiency, infrastructure scalability, and runway sustainability for: {query}"
+            subtype = "user_growth"
         else:
             dec_type = "strategic_decision"
             obj = f"Evaluate financial runway, growth velocity, operational capacity, and unit economics for: {query}"

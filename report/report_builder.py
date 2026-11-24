@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, Any, List, Optional
 from state.schemas import (
     Report,
@@ -24,9 +25,11 @@ def build_consolidated_report(
     mc_summary: Optional[Dict[str, Any]] = None,
     degraded_agents: Optional[List[str]] = None,
     company_data: Optional[Dict[str, Any]] = None,
-    findings: Optional[List[Finding]] = None
+    findings: Optional[List[Finding]] = None,
+    llm_synthesis: Optional[Dict[str, Any]] = None
 ) -> Report:
     data = company_data or load_company_data()
+    company_display_name = data.get("company_name", "the company") if data else "the company"
     model_cfg = load_model_config()
     ranked = rank_strategies(sim_runs, decision.constraints, company_data=data)
     conf_assessment = compute_confidence(
@@ -121,9 +124,56 @@ def build_consolidated_report(
         conflicts=conflicts
     )
 
+    def _extract_dynamic_topic(query_text: str, findings: List[Finding]) -> str:
+        q_clean = query_text.lower().strip() if query_text else ""
+
+        # Priority 1: Specific strategic themes
+        if any(k in q_clean for k in ["customer success", "support organization", "csm team", "support structure"]):
+            return "Tiered Customer Success Architecture & Support Deflection Model"
+        if any(k in q_clean for k in ["user growth", "increase number of users", "increase users", "scale users", "user acquisition"]):
+            return "Gated Freemium Expansion & User Acquisition Strategy"
+        if any(k in q_clean for k in ["business operating system", "operating system", "merchant operating"]):
+            return "Commerce Platform Evolution & Merchant Operating System Expansion"
+        if any(k in q_clean for k in ["financial services", "financial partner", "fintech", "banking"]):
+            return "Financial Services Ecosystem Restructuring & Partner Monetization"
+        if any(k in q_clean for k in ["developer platform", "monetize third-party", "integrations", "apis"]):
+            return "Developer Platform & Partner Integration Monetization"
+        if any(k in q_clean for k in ["churn", "retention", "cancel"]):
+            return "Proactive Retention Program & Churn Mitigation"
+        if any(k in q_clean for k in ["enterprise", "custom sla", "dedicated sla"]):
+            return "Enterprise Tier Packaging & Dedicated SLA Offering"
+
+        # Priority 2: Extract from specialist findings
+        for f in findings:
+            f_claim = f.claim.lower()
+            if "tiered customer-success" in f_claim or "tiered customer success" in f_claim or "customer success" in f_claim:
+                return "Tiered Customer Success Architecture & Support Model"
+            if "freemium expansion" in f_claim or "freemium tier" in f_claim or "organic acquisition" in f_claim:
+                return "Gated Freemium Expansion & Funnel Optimization"
+            if "operating system" in f_claim or "platform evolution" in f_claim:
+                return "Commerce Platform Evolution & Merchant OS Expansion"
+            if "financial services" in f_claim or "financial ecosystem" in f_claim:
+                return "Financial Services Ecosystem Restructuring"
+
+        # Priority 3: Clean extraction from the question itself
+        cleaned = re.sub(
+            r'^(should we|can we|how should [a-z0-9_-]+|how should we|how do we|what if we|what strategy should we execute to|what strategy should we|how can we|is it viable to)\s+',
+            '',
+            query_text,
+            flags=re.I
+        ).strip(" ?.")
+        words = cleaned.split()
+        if len(words) > 8:
+            cleaned = " ".join(words[:8])
+        return cleaned.title() if cleaned else "Strategic Initiative Execution"
+
+    dynamic_topic = _extract_dynamic_topic(decision.question, findings_list)
     extract_target_spend = getattr(getattr(decision, "classification", None), "target_spend", None)
 
-    if subtype == "revenue_vs_runway":
+    if llm_synthesis and isinstance(llm_synthesis, dict) and llm_synthesis.get("recommendation_title") and llm_synthesis.get("executive_summary"):
+        rec_title = llm_synthesis["recommendation_title"].strip()
+        exec_summary = llm_synthesis["executive_summary"].strip()
+    elif subtype == "revenue_vs_runway":
         rec_title = "Proceed with Limits: Conditional $35,000/month Sales & Marketing Spend"
         exec_summary = (
             f"Recommendation: Proceed with Limits: Conditional $35,000/month Sales & Marketing Spend (Confidence: {conf_assessment.level}). "
@@ -318,24 +368,21 @@ def build_consolidated_report(
     elif is_rejected_by_agents:
         if any(k in q_lower for k in ["sell", "exit", "acquisition", "buyout", "merger"]):
             rec_title = "Hold & Scale: Do Not Sell Company at Current Stage"
-        else:
-            rec_title = "Reject: Do not proceed with proposal"
-
-        agent_points = []
-        for f in reject_findings[:3]:
-            clean_claim = f.claim.strip().rstrip(".")
-            agent_points.append(f"{f.agent}: {clean_claim}")
-        claims_prose = "; ".join(agent_points)
-
-        if "sell" in q_lower or "exit" in q_lower or "buyout" in q_lower:
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
-                f"Executive analysis across {len(reject_findings)} specialist agents advises against selling NimbusDesk at current valuation. "
+                f"Executive analysis across {len(reject_findings)} specialist agents advises against selling {company_display_name} at current valuation. "
                 f"Financial simulations confirm that maintaining independent scale preserves {top_strategy.runway_months_12:.1f} months of cash runway "
                 f"(safety threshold: {min_runway_constraint:.1f} mo) and ${top_strategy.net_contribution_12:,.2f} in cumulative 12-month net contribution, "
-                f"allowing NimbusDesk to capture expanding organic traffic and achieve higher enterprise valuation before evaluating strategic exits."
+                f"allowing {company_display_name} to capture expanding organic traffic and achieve higher enterprise valuation before evaluating strategic exits."
             )
         else:
+            rec_title = "Reject: Do not proceed with proposal"
+            agent_points = []
+            for f in reject_findings[:3]:
+                clean_claim = f.claim.strip().rstrip(".")
+                agent_points.append(f"{f.agent}: {clean_claim}")
+            claims_prose = "; ".join(agent_points)
+
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
                 f"Executive analysis across {len(reject_findings)} specialist agents advises rejecting the proposed initiative "
@@ -345,8 +392,32 @@ def build_consolidated_report(
                 f"without taking on unvalidated strategic, brand, or operational disruption."
             )
     elif top_strategy and top_strategy.is_feasible:
+        proceed_with_limits_agents = [f for f in findings_list if f.recommendation == "proceed_with_limits"]
+        has_limits = len(proceed_with_limits_agents) > 0
+        prefix = "Proceed with Limits: " if has_limits else "Proceed with "
+
         if is_revenue_restructure_query:
             rec_title = "Proceed with Phased Revenue Restructuring: Shift to Tiered Subscriptions, AI Modules & Value-Added Services"
+        elif "calibrated_hiring" in top_name.lower() or subtype == "general_hiring":
+            rec_title = "Calibrated Recommendation: 10%–15% Headcount Expansion (1–2 Strategic Roles)"
+        elif "independent_scale" in top_name.lower() or subtype == "m_and_a_exit":
+            rec_title = "Hold & Scale: Maintain Independent Growth (Do Not Sell)"
+        elif subtype == "user_growth" or "freemium_acquisition_expansion" in top_name.lower() or ("user" in q_lower and "growth" in q_lower):
+            rec_title = f"{prefix}{dynamic_topic}"
+        elif "20pct_price_increase" in top_name.lower() or (subtype == "price_increase" and "20" in q_lower):
+            rec_title = "Proceed with 20% Price Increase"
+        elif "10pct_with_grandfathering" in top_name.lower() or (subtype == "price_increase" and "10" in q_lower):
+            rec_title = "Proceed with 10% Price Increase & Grandfathering"
+        elif "usage_caps" in top_name.lower() or (subtype == "free_plan" and "usage caps" in top_name.lower()):
+            rec_title = "Proceed with Strategy B: Freemium with Usage Caps"
+        elif subtype == "enterprise_tier":
+            rec_title = "Proceed with Enterprise Tier & Dedicated SLA Packaging"
+        elif subtype == "churn_reduction":
+            rec_title = "Proceed with Proactive Customer Success & Retention Program"
+        else:
+            rec_title = f"{prefix}{dynamic_topic}"
+
+        if is_revenue_restructure_query:
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
                 f"Executive council analysis across {len(findings_list)} specialist agents recommends a multi-phased revenue restructuring "
@@ -358,8 +429,7 @@ def build_consolidated_report(
                 f"This restructuring stabilizes gross margins above 70%, insulates operating contribution from cyclical GMV downturns, "
                 f"and protects long-term cash runway."
             )
-        elif "calibrated_hiring" in top_name.lower():
-            rec_title = "Calibrated Recommendation: 10%–15% Headcount Expansion (1–2 Strategic Roles)"
+        elif "calibrated_hiring" in top_name.lower() and not findings_list:
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
                 f"Under expected operating parameters, calibrated headcount expansion generates an estimated ${top_strategy.net_contribution_12:,.2f} "
@@ -367,8 +437,7 @@ def build_consolidated_report(
                 f"(safety threshold: {min_runway_constraint:.1f} mo). "
                 f"Executive alignment confirms adding 1–2 key strategic technical and growth roles accelerates recurring revenue while safeguarding the safety floor."
             )
-        elif "independent_scale" in top_name.lower():
-            rec_title = "Hold & Scale: Maintain Independent Growth (Do Not Sell)"
+        elif "independent_scale" in top_name.lower() and not findings_list:
             exec_summary = (
                 f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
                 f"Independent scaling generates an estimated ${top_strategy.net_contribution_12:,.2f} "
@@ -376,40 +445,69 @@ def build_consolidated_report(
                 f"(safety threshold: {min_runway_constraint:.1f} mo). "
                 f"Executive analysis recommends maximizing ARR multiple independently before seeking an M&A exit."
             )
-        elif "20pct_price_increase" in top_name.lower():
-            rec_title = "Proceed with 20% Price Increase"
-            exec_summary = (
-                f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
-                f"Under expected operating parameters, a 20% price increase generates an estimated ${top_strategy.net_contribution_12:,.2f} "
-                f"in cumulative 12-month net contribution while preserving {top_strategy.runway_months_12:.1f} months of cash runway "
-                f"(safety threshold: {min_runway_constraint:.1f} mo)."
-            )
-        elif "10pct_with_grandfathering" in top_name.lower():
-            rec_title = "Proceed with 10% Price Increase & Grandfathering"
-            exec_summary = (
-                f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
-                f"Under expected operating parameters, 10% price increase with grandfathering generates an estimated ${top_strategy.net_contribution_12:,.2f} "
-                f"in cumulative 12-month net contribution while preserving {top_strategy.runway_months_12:.1f} months of cash runway "
-                f"(safety threshold: {min_runway_constraint:.1f} mo)."
-            )
-        elif "usage_caps" in top_name.lower():
-            rec_title = "Proceed with Strategy B: Freemium with Usage Caps"
-            exec_summary = (
-                f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
-                f"Under expected operating parameters, Strategy B (Usage Caps) generates an estimated ${top_strategy.net_contribution_12:,.2f} "
-                f"in cumulative 12-month net contribution while preserving {top_strategy.runway_months_12:.1f} months of cash runway "
-                f"(safety threshold: {min_runway_constraint:.1f} mo). "
-                f"The recommendation remains viable as long as free-to-paid conversion stays above {flip_thresh_str}."
-            )
         else:
-            rec_title = f"Proceed with {top_name_pretty}"
-            exec_summary = (
-                f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
-                f"Under expected operating parameters, {top_name_pretty} generates an estimated ${top_strategy.net_contribution_12:,.2f} "
-                f"in cumulative 12-month net contribution while preserving {top_strategy.runway_months_12:.1f} months of cash runway "
-                f"(safety threshold: {min_runway_constraint:.1f} mo). "
-                f"The recommendation remains viable as long as free-to-paid conversion stays above {flip_thresh_str}."
+            quant_narrative = (
+                f"Under expected operating parameters, executing {dynamic_topic.lower()} generates an estimated "
+                f"${top_strategy.net_contribution_12:,.2f} in cumulative 12-month net contribution while preserving "
+                f"{top_strategy.runway_months_12:.1f} months of cash runway (safety threshold: {min_runway_constraint:.1f} mo)."
             )
+
+            if findings_list:
+                specialist_flow = []
+                cfo_f = next((f for f in findings_list if f.agent.upper() == "CFO"), None)
+                growth_f = next((f for f in findings_list if f.agent.upper() == "GROWTH"), None)
+                cto_f = next((f for f in findings_list if f.agent.upper() == "CTO"), None)
+                cs_f = next((f for f in findings_list if f.agent.upper() in ["CUSTOMER", "CUSTOMER SUCCESS"]), None)
+                prod_f = next((f for f in findings_list if f.agent.upper() == "PRODUCT"), None)
+
+                if cfo_f:
+                    specialist_flow.append(f"CFO analysis verifies capital feasibility ({cfo_f.claim.strip().rstrip('.')})")
+                if growth_f:
+                    specialist_flow.append(f"Growth forecasts accelerated distribution ({growth_f.claim.strip().rstrip('.')})")
+                if cto_f:
+                    specialist_flow.append(f"CTO infrastructure directives mandate compute and rate-limit guardrails ({cto_f.claim.strip().rstrip('.')})")
+                if cs_f:
+                    specialist_flow.append(f"Customer Success structures operational delivery ({cs_f.claim.strip().rstrip('.')})")
+                if prod_f:
+                    specialist_flow.append(f"Product leadership highlights ({prod_f.claim.strip().rstrip('.')})")
+
+                for f in findings_list:
+                    if f.agent.upper() not in ["CFO", "GROWTH", "CTO", "CUSTOMER", "CUSTOMER SUCCESS", "PRODUCT", "SKEPTIC"]:
+                        specialist_flow.append(f"{f.agent} evaluates ({f.claim.strip().rstrip('.')})")
+
+                council_prose = (
+                    f" Executive specialist evaluation across {len(findings_list)} functional leaders "
+                    f"({', '.join(f.agent for f in findings_list)}) establishes an aligned consensus: "
+                    + "; ".join(specialist_flow[:4]) + "."
+                )
+
+                guardrails = []
+                for f in findings_list:
+                    if f.limitations:
+                        for lim in f.limitations:
+                            clean_lim = lim.strip().rstrip(".")
+                            guardrails.append(f"{f.agent} mandates {clean_lim}")
+
+                if guardrails:
+                    guardrail_prose = f" Operational guardrails: {'; '.join(guardrails[:3])}."
+                elif flip_point_info.get("has_flip_point"):
+                    guardrail_prose = f" The recommendation remains viable as long as free-to-paid conversion stays above {flip_thresh_str}."
+                else:
+                    guardrail_prose = f" Operational viability requires maintaining net burn and runway above the {min_runway_constraint:.1f}-month safety floor."
+
+                exec_summary = (
+                    f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
+                    f"{quant_narrative}{council_prose}{guardrail_prose}"
+                )
+            else:
+                if flip_point_info.get("has_flip_point"):
+                    guardrail_prose = f" The recommendation remains viable as long as free-to-paid conversion stays above {flip_thresh_str}."
+                else:
+                    guardrail_prose = f" All evaluated parameters satisfy the {min_runway_constraint:.1f}-month safety runway constraint."
+                exec_summary = (
+                    f"Recommendation: {rec_title} (Confidence: {conf_assessment.level}). "
+                    f"{quant_narrative} {guardrail_prose}"
+                )
     else:
         rec_title = "Do not proceed"
         exec_summary = (
@@ -473,7 +571,6 @@ def build_consolidated_report(
     if "monthly_cloud_cost" in infra:
         reg.register_source(value=float(infra["monthly_cloud_cost"]), path="sections.current_position.monthly_cloud_cost", source_ref="company:infrastructure.monthly_cloud_cost")
 
-    import re
     prose_num_pattern = re.compile(r"(\$)?\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|\d+(?:\.\d+)?)\b(%?)")
     for block_name, block_content in [("recommendation", rec_title), ("executive_summary", exec_summary)]:
         for m in prose_num_pattern.finditer(block_content):
@@ -487,6 +584,31 @@ def build_consolidated_report(
                 )
             except ValueError:
                 pass
+
+    for f in findings_list:
+        for m in prose_num_pattern.finditer(f.claim):
+            raw_str = m.group(2).replace(",", "")
+            try:
+                num_v = float(raw_str)
+                reg.register_source(
+                    value=num_v,
+                    path=f"sections.agent_findings.{f.agent}.claim_num",
+                    source_ref=f"claim:{f.agent}:{num_v}"
+                )
+            except ValueError:
+                pass
+        for lim in (f.limitations or []):
+            for m in prose_num_pattern.finditer(str(lim)):
+                raw_str = m.group(2).replace(",", "")
+                try:
+                    num_v = float(raw_str)
+                    reg.register_source(
+                        value=num_v,
+                        path=f"sections.agent_findings.{f.agent}.lim_num",
+                        source_ref=f"limit:{f.agent}:{num_v}"
+                    )
+                except ValueError:
+                    pass
 
     for item in reconciled_ctx.numerical_reconciliations:
         val = float(item["deterministic_value"])
@@ -607,7 +729,6 @@ def build_consolidated_report(
             )
 
     # 8. Conflicts Resolution
-    import re
     conf_num_pattern = re.compile(r"(\$)?\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|\d+(?:\.\d+)?)\b(%?)")
     conflicts_resolution = []
     for i, c in enumerate(conflicts):
@@ -783,11 +904,30 @@ def build_consolidated_report(
     # 11. Verification Summary
     verif_summary = [v.model_dump() for v in verification_results]
 
-    skeptic_audit_results = {
-        "challenged_assumptions": [
+    skeptic_findings = [f for f in findings_list if f.agent.lower() == "skeptic"]
+    challenged = []
+    if skeptic_findings:
+        for sf in skeptic_findings:
+            for lim in (sf.limitations or []):
+                challenged.append({
+                    "parameter": "domain_guardrail",
+                    "proposed_by": "Skeptic",
+                    "critique": lim
+                })
+            if sf.claim:
+                challenged.append({
+                    "parameter": "strategic_risk",
+                    "proposed_by": "Skeptic",
+                    "critique": sf.claim
+                })
+    if not challenged:
+        challenged = [
             {"parameter": "monthly_free_signups", "proposed_by": "Growth", "critique": "Assumed 5,000 organic free signups lacks paid acquisition backing."},
             {"parameter": "free_to_paid_conversion", "proposed_by": "Growth", "critique": "3.0% conversion exceeds historical benchmark of 1.5%."}
-        ],
+        ]
+
+    skeptic_audit_results = {
+        "challenged_assumptions": challenged,
         "financial_inconsistencies": reconciled_ctx.numerical_reconciliations,
         "unsupported_claims": [],
         "evidence_gaps": [],
