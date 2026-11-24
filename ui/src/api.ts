@@ -97,7 +97,7 @@ export async function login(payload: { email: string; password: string; remember
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
-    let msg = 'Invalid credentials';
+    let msg = res.status === 401 ? 'Invalid executive credentials. Please verify your login details.' : `Server error (${res.status}). Please verify the backend service is running.`;
     try {
       const err = await res.json();
       if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
