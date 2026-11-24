@@ -70,7 +70,7 @@ export const MissionControl: React.FC<MissionControlProps> = ({
         isComplete={isComplete}
       />
 
-      {/* 2. Primary Canvas: 11-Node Orchestration DAG Execution Blueprint */}
+      {/* 2. Primary Canvas: Dynamic Orchestration DAG Execution Blueprint */}
       <div className="w-full h-[380px] xl:h-[400px]">
         <OrchestrationGraph
           tasks={tasks}
@@ -80,6 +80,7 @@ export const MissionControl: React.FC<MissionControlProps> = ({
           activePackets={model.activePackets}
           onSelectFinding={onInspectFinding}
           isIdleStandby={isIdle}
+          selectedSpecialists={model.selectedSpecialists}
         />
       </div>
 
@@ -92,6 +93,7 @@ export const MissionControl: React.FC<MissionControlProps> = ({
             showBackup={model.showBackup}
             backupState={model.backupState}
             onInspectAgent={handleInspectAgent}
+            selectedSpecialists={model.selectedSpecialists}
           />
         </div>
 

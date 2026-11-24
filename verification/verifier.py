@@ -476,14 +476,29 @@ def verify_agent_participation_integrity(report: Optional[Report]) -> Verificati
     if not findings:
         return VerificationResult(check_name="agent_participation_integrity", status="passed", detail="No findings to audit.")
     agents_present = {f.get("agent", "").upper() for f in findings}
-    expected_agents = {"CFO", "GROWTH", "CTO", "CUSTOMER", "PRODUCT", "SKEPTIC"}
+    
+    # Check if report contains dynamic specialist selection from supervisor routing
+    selected = report.sections.get("selected_specialists")
+    if selected and isinstance(selected, list):
+        expected_agents = {s.upper() for s in selected} | {"SKEPTIC"}
+    else:
+        expected_agents = {"CFO", "GROWTH", "CTO", "CUSTOMER", "PRODUCT", "SKEPTIC"}
+
     missing = expected_agents - agents_present
-    if len(missing) > 2:
-        return VerificationResult(
-            check_name="agent_participation_integrity",
-            status="failed",
-            detail=f"Missing expected specialist agents: {', '.join(missing)}."
-        )
+    if selected:
+        if missing:
+            return VerificationResult(
+                check_name="agent_participation_integrity",
+                status="failed",
+                detail=f"Missing expected specialist agents: {', '.join(missing)}."
+            )
+    else:
+        if len(missing) > 2:
+            return VerificationResult(
+                check_name="agent_participation_integrity",
+                status="failed",
+                detail=f"Missing expected specialist agents: {', '.join(missing)}."
+            )
     return VerificationResult(
         check_name="agent_participation_integrity",
         status="passed",

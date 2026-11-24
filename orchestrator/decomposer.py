@@ -1,7 +1,13 @@
+from typing import Optional, List
 from state.schemas import Decision, Task
 from orchestrator.dag import TaskDAG, DAGValidationError
 
-def decompose_decision(decision: Decision) -> TaskDAG:
+ALL_SPECIALISTS = ["cfo", "growth", "cto", "customer", "product"]
+
+def decompose_decision(
+    decision: Decision,
+    selected_specialists: Optional[List[str]] = None
+) -> TaskDAG:
     dag = TaskDAG()
 
     if decision.type == "unsupported":
@@ -14,20 +20,29 @@ def decompose_decision(decision: Decision) -> TaskDAG:
             f"Clarification Required: {decision.objective}"
         )
 
-    # 1. Parallel specialist analysis tasks
+    # Determine active specialists from argument, metadata, or default to all 5
+    specs_to_use = selected_specialists
+    if not specs_to_use and decision.metadata and isinstance(decision.metadata, dict):
+        specs_to_use = decision.metadata.get("selected_specialists")
+
+    if specs_to_use:
+        active_specs = [s for s in ALL_SPECIALISTS if s in specs_to_use]
+        if not active_specs:
+            active_specs = ALL_SPECIALISTS
+    else:
+        active_specs = ALL_SPECIALISTS
+
+    # 1. Parallel specialist analysis tasks (dynamically routed)
     analysis_tasks = [
-        Task(id="task_cfo_analysis", owner_agent="cfo", depends_on=[], kind="agent_analysis"),
-        Task(id="task_growth_analysis", owner_agent="growth", depends_on=[], kind="agent_analysis"),
-        Task(id="task_cto_analysis", owner_agent="cto", depends_on=[], kind="agent_analysis"),
-        Task(id="task_customer_analysis", owner_agent="customer", depends_on=[], kind="agent_analysis"),
-        Task(id="task_product_analysis", owner_agent="product", depends_on=[], kind="agent_analysis")
+        Task(id=f"task_{agent}_analysis", owner_agent=agent, depends_on=[], kind="agent_analysis")
+        for agent in active_specs
     ]
     for t in analysis_tasks:
         dag.add_task(t)
 
     analysis_ids = [t.id for t in analysis_tasks]
 
-    # 2. Skeptic Audit (depends on all analysis tasks)
+    # 2. Skeptic Audit (depends on all selected analysis tasks)
     dag.add_task(Task(
         id="task_skeptic_audit",
         owner_agent="skeptic",

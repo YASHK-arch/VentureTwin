@@ -170,12 +170,43 @@ export async function fetchCompany(): Promise<CompanySnapshot> {
   return res.json();
 }
 
-export async function submitDecision(query: string, constraints?: Record<string, any>, injectedFailure?: any) {
+export interface SupervisorRoutingDecision {
+  context_summary: string;
+  selected_specialists: string[];
+  specialist_directives: Record<string, string>;
+  reasoning: string;
+  source: string;
+}
+
+export async function fetchRoutingDecision(query: string, companyId?: string): Promise<SupervisorRoutingDecision> {
+  const res = await fetch(`${API_BASE}/orchestration/route`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ query, company_id: companyId })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch routing decision');
+  }
+  return res.json();
+}
+
+export async function submitDecision(
+  query: string,
+  constraints?: Record<string, any>,
+  injectedFailure?: any,
+  selectedSpecialists?: string[]
+) {
   const res = await fetch(`${API_BASE}/decisions`, {
     method: 'POST',
     credentials: 'include',
     headers: getHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ query, constraints, injected_failure: injectedFailure })
+    body: JSON.stringify({
+      query,
+      constraints,
+      injected_failure: injectedFailure,
+      selected_specialists: selectedSpecialists
+    })
   });
   if (!res.ok) {
     let msg = 'Failed to submit decision';

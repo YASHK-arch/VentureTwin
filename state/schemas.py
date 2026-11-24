@@ -109,6 +109,7 @@ class Decision(BaseModel):
     constraints: Dict[str, Any] = Field(default_factory=dict)
     classification: Optional[DecisionClassification] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 TaskKind = Literal[
     "agent_analysis",
@@ -253,6 +254,7 @@ class Event(BaseModel):
     ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     type: Literal[
         "task_created",
+        "routing_decided",
         "agent_started",
         "finding_posted",
         "conflict_detected",

@@ -7,6 +7,7 @@ interface AgentRosterProps {
   showBackup: boolean;
   backupState: AgentRosterState;
   onInspectAgent?: (agentId: string) => void;
+  selectedSpecialists?: string[];
 }
 
 const ROSTER_ORDER = ['supervisor', 'cfo', 'growth', 'cto', 'customer', 'product', 'skeptic'];
@@ -15,8 +16,15 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({
   agentStates,
   showBackup,
   backupState,
-  onInspectAgent
+  onInspectAgent,
+  selectedSpecialists
 }) => {
+  const totalAgents = showBackup ? 8 : 7;
+  const activeSpecialists = selectedSpecialists && selectedSpecialists.length > 0
+    ? selectedSpecialists
+    : ['cfo', 'growth', 'cto', 'customer', 'product'];
+  const activeCount = 2 + activeSpecialists.length + (showBackup ? 1 : 0);
+
   return (
     <div className="flex flex-col h-full bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-lg backdrop-blur-sm">
       {/* Roster Header */}
@@ -26,7 +34,7 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({
             Agent Roster
           </span>
           <span className="text-[10px] text-slate-500 font-mono">
-            ({showBackup ? '8' : '7'} agents)
+            ({activeCount} active of {totalAgents} agents)
           </span>
         </div>
         <span className="text-[9px] font-mono text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/30">
@@ -40,12 +48,15 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({
           const agent = agentStates[agentId];
           if (!agent) return null;
           const meta = getAgentMeta(agentId);
+          const isSpecialist = ['cfo', 'growth', 'cto', 'customer', 'product'].includes(agentId);
+          const isExcluded = isSpecialist && !activeSpecialists.includes(agentId);
 
           return (
             <AgentCard
               key={agentId}
               agent={agent}
               meta={meta}
+              isExcluded={isExcluded}
               onClick={() => onInspectAgent && onInspectAgent(agentId)}
             />
           );
@@ -71,37 +82,48 @@ interface AgentCardProps {
   agent: AgentRosterState;
   meta: ReturnType<typeof getAgentMeta>;
   isBackup?: boolean;
+  isExcluded?: boolean;
   onClick?: () => void;
 }
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent, meta, isBackup = false, onClick }) => {
-  const { status, currentTool, elapsedSeconds, recommendation, confidence, attempts } = agent;
+const AgentCard: React.FC<AgentCardProps> = ({
+  agent,
+  meta,
+  isBackup = false,
+  isExcluded = false,
+  onClick
+}) => {
+  const { status, currentTool, elapsedSeconds, recommendation, confidence, attempts, directive } = agent;
 
   // Halo / Border styling
-  let haloClass = 'border-slate-700 bg-slate-800/50';
-  let badgeText = 'Standing by';
-  let badgeColor = 'text-slate-500 bg-slate-900 border-slate-800';
+  let haloClass = isExcluded ? 'border-slate-800 bg-slate-900/30 opacity-60' : 'border-slate-700 bg-slate-800/50';
+  let badgeText = isExcluded ? 'Standby' : 'Standing by';
+  let badgeColor = isExcluded
+    ? 'text-slate-600 bg-slate-900/50 border-slate-800/60'
+    : 'text-slate-500 bg-slate-900 border-slate-800';
 
-  if (status === 'working') {
-    haloClass = 'border-teal-400 shadow-[0_0_10px_rgba(20,184,166,0.5)] animate-pulse bg-teal-500/10';
-    badgeText = 'Working';
-    badgeColor = 'text-teal-300 bg-teal-500/20 border-teal-500/40';
-  } else if (status === 'retrying') {
-    haloClass = 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)] animate-pulse bg-amber-500/10';
-    badgeText = `Retry ${attempts}/3`;
-    badgeColor = 'text-amber-300 bg-amber-500/20 border-amber-500/40';
-  } else if (status === 'failed') {
-    haloClass = 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)] bg-rose-500/10';
-    badgeText = 'Fault';
-    badgeColor = 'text-rose-300 bg-rose-500/20 border-rose-500/40';
-  } else if (status === 'backup') {
-    haloClass = 'border-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.5)] bg-purple-500/10';
-    badgeText = 'Recovered (Backup)';
-    badgeColor = 'text-purple-300 bg-purple-500/20 border-purple-500/40';
-  } else if (status === 'done') {
-    haloClass = 'border-emerald-500/80 bg-emerald-500/5';
-    badgeText = 'Done';
-    badgeColor = 'text-emerald-300 bg-emerald-500/20 border-emerald-500/40';
+  if (!isExcluded) {
+    if (status === 'working') {
+      haloClass = 'border-teal-400 shadow-[0_0_10px_rgba(20,184,166,0.5)] animate-pulse bg-teal-500/10';
+      badgeText = 'Working';
+      badgeColor = 'text-teal-300 bg-teal-500/20 border-teal-500/40';
+    } else if (status === 'retrying') {
+      haloClass = 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)] animate-pulse bg-amber-500/10';
+      badgeText = `Retry ${attempts}/3`;
+      badgeColor = 'text-amber-300 bg-amber-500/20 border-amber-500/40';
+    } else if (status === 'failed') {
+      haloClass = 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)] bg-rose-500/10';
+      badgeText = 'Fault';
+      badgeColor = 'text-rose-300 bg-rose-500/20 border-rose-500/40';
+    } else if (status === 'backup') {
+      haloClass = 'border-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.5)] bg-purple-500/10';
+      badgeText = 'Recovered (Backup)';
+      badgeColor = 'text-purple-300 bg-purple-500/20 border-purple-500/40';
+    } else if (status === 'done') {
+      haloClass = 'border-emerald-500/80 bg-emerald-500/5';
+      badgeText = 'Done';
+      badgeColor = 'text-emerald-300 bg-emerald-500/20 border-emerald-500/40';
+    }
   }
 
   const confidencePct = confidence !== undefined ? Math.round(confidence * 100) : undefined;
@@ -192,9 +214,22 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, meta, isBackup = false, on
             </div>
           )}
 
-          {status === 'standby' && (
+          {isExcluded && (
+            <div className="text-[10px] font-mono text-slate-500 italic">
+              Standby &middot; Excluded from active DAG
+            </div>
+          )}
+
+          {!isExcluded && status === 'standby' && (
             <div className="text-[10px] font-mono text-slate-500">
               Awaiting dispatch
+            </div>
+          )}
+
+          {directive && !isExcluded && (
+            <div className="mt-1 text-[9.5px] font-sans text-purple-300 bg-purple-950/30 border border-purple-500/20 rounded px-1.5 py-0.5 leading-snug">
+              <span className="font-semibold text-purple-400 font-mono text-[9px] uppercase tracking-wider block">Directive:</span>
+              {directive}
             </div>
           )}
         </div>
